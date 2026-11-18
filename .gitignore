@@ -1,0 +1,6 @@
+.pio/
+.pio-core/
+.venv/
+.vscode/
+__pycache__/
+factory-backup.bin

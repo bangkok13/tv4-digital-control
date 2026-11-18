@@ -1,0 +1,74 @@
+#pragma once
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <optional>
+
+namespace tv4 {
+enum class Mode : uint8_t { Demo, Live };
+enum class Signal : uint8_t { Waiting, FirstPulse, Tracking, Silent, Overrun };
+enum class Field : uint8_t { Brightness, Threshold, Pulses, Refresh, Smoothing, Scale, Count };
+struct FieldSpec { int minimum, maximum, step; const char* label; const char* unit; };
+inline constexpr FieldSpec fields[] = {
+    {10,100,5,"Яркость","%"}, {1,200,1,"Порог вращения","RPM"},
+    {1,32,1,"Импульсов на оборот",""}, {50,1000,50,"Обновление RPM","мс"},
+    {5,100,5,"Вес нового отсчёта","%"}, {500,6000,250,"Максимум шкалы","RPM"}
+};
+struct Settings {
+    uint16_t values[6]{75,10,1,150,35,1500};
+    Mode mode = Mode::Demo;
+    uint8_t reserved = 0;
+    int get(Field f) const { return values[static_cast<unsigned>(f)]; }
+    bool adjust(Field f, int direction) {
+        const auto index = static_cast<unsigned>(f);
+        const auto& spec = fields[index];
+        const auto next = std::clamp(int(values[index])+direction*spec.step, spec.minimum,spec.maximum);
+        if (next == values[index]) return false;
+        values[index] = uint16_t(next);
+        return true;
+    }
+    bool valid() const {
+        if (mode != Mode::Demo && mode != Mode::Live) return false;
+        for (unsigned i=0; i<6; ++i)
+            if (values[i] < fields[i].minimum || values[i] > fields[i].maximum) return false;
+        return true;
+    }
+};
+struct Measurement {
+    Signal signal = Signal::Waiting;
+    double rpm = 0;
+    bool hasRpm = false, rotating = false;
+    uint64_t pulses = 0, rejected = 0, lost = 0, lastEdgeUs = 0;
+};
+struct Totals {
+    uint64_t runningUs = 0, rpmTime = 0, starts = 0;
+    uint32_t peakRpm = 0, reserved = 0;
+    double average() const { return runningUs ? double(rpmTime)/runningUs : 0; }
+    bool valid() const { return peakRpm <= 6000 && (runningUs || (!rpmTime && !peakRpm && !starts)); }
+};
+enum class DriveDirection { Forward, Reverse };
+struct DriveTelemetry {
+    bool connected = false;
+    std::optional<float> outputHz, motorCurrentA;
+    std::optional<DriveDirection> direction;
+    std::optional<uint16_t> statusWord, faultCode;
+};
+static_assert(sizeof(Settings)==14 && sizeof(Totals)==32, "Bump NVS schema if the record layout changes");
+struct Diagnostics {
+    uint32_t freeHeap = 0, minHeap = 0, flashBytes = 0;
+    uint16_t revision = 0;
+    char chip[32] = "", resetReason[28] = "";
+    bool touchBus = false, touchSeen = false, calibrated = false, storageOK = true;
+};
+struct MachineState {
+    Settings settings{};
+    Measurement motion{};
+    Totals totals{};
+    uint64_t uptimeUs = 0, sessionUs = 0;
+    Diagnostics diagnostic{};
+    DriveTelemetry drive{};
+};
+inline uint64_t saturatedSum(uint64_t a, uint64_t b) {
+    return UINT64_MAX-a < b ? UINT64_MAX : a+b;
+}
+}
