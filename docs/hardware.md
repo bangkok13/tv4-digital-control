@@ -4,6 +4,8 @@
 
 Конкретная плата на стенде определилась по Micro-USB как USB-SERIAL CH340, VID:PID `1A86:7523`, COM3. Команда `flash_id` подтвердила ESP32-D0WD-V3 ревизии 3.1, кварц 40 МГц и 4 МиБ Flash (JEDEC C8:4016). Номер COM относится к этому компьютеру и может измениться.
 
+На этом экземпляре прошла проверка `discovery-st7789`: пользователь подтвердил правильный порядок RGB и попадание метки под палец; журнал XPT2046 зарегистрировал реальные отсчёты и успешное сохранение четырёхточечной калибровки. Для этой платы выбран `panel-st7789`.
+
 | Сборка discovery | Предполагаемая комплектация | Основание |
 | --- | --- | --- |
 | `discovery-st7789` | Двухпортовая 2432S028R/Rv3, ST7789 и XPT2046 | [Профиль Rv3 в PlatformIO](https://github.com/rzeldent/platformio-espressif32-sunton/blob/main/esp32-2432S028Rv3.json), [конфигурация TFT_eSPI именно для CYD2USB](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/blob/main/DisplayConfig/CYD2USB/User_Setup.h) |
