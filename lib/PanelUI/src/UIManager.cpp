@@ -6,6 +6,7 @@
 extern "C" {
 LV_FONT_DECLARE(tv4_text_15);
 LV_FONT_DECLARE(tv4_title_23);
+LV_IMG_DECLARE(tv4_splash_motorcycle);
 }
 namespace tv4 {
 namespace {
@@ -53,13 +54,14 @@ void number(char* out,size_t size,uint64_t n) {
 }
 void drawSplash(lv_obj_t* body) {
     constexpr uint32_t brass = 0xffbf51;
-    label(body, LV_SYMBOL_CHARGE, 0, 7, 240, brass, LV_TEXT_ALIGN_CENTER, &lv_font_montserrat_48);
-    label(body, "6 VOLT", 0, 67, 240, white, LV_TEXT_ALIGN_CENTER, &lv_font_montserrat_48);
+    auto* photo = lv_img_create(body);
+    lv_img_set_src(photo, &tv4_splash_motorcycle);
+    label(body, "6 VOLT", 0, 166, 240, white, LV_TEXT_ALIGN_CENTER, &lv_font_montserrat_48);
 
-    auto* garage = label(body, "GARAGE", 0, 127, 240, brass, LV_TEXT_ALIGN_CENTER, &lv_font_montserrat_20);
+    auto* garage = label(body, "GARAGE", 0, 224, 240, brass, LV_TEXT_ALIGN_CENTER, &lv_font_montserrat_20);
     lv_obj_set_style_text_letter_space(garage, 7, 0);
 
-    auto* greeting = label(body, "С ДР, БРО!", 42, 177, 156, white, LV_TEXT_ALIGN_CENTER);
+    auto* greeting = label(body, "С ДР, БРО!", 42, 264, 156, white, LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_border_side(greeting, LV_BORDER_SIDE_TOP, 0);
     lv_obj_set_style_border_color(greeting, color(brass), 0);
     lv_obj_set_style_border_width(greeting, 1, 0);
@@ -76,17 +78,15 @@ void UIManager::begin() {
     lv_obj_set_style_bg_color(root,color(bg),0);
     lv_obj_set_style_bg_opa(root,LV_OPA_COVER,0);
     lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
+    body_=lv_obj_create(root);
+    lv_obj_remove_style_all(body_);
+    lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);
     title_=label(root,"",12,12,184);
     badge_=label(root,"",200,10,28,amber,LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_bg_color(badge_,color(surface),0);
     lv_obj_set_style_bg_opa(badge_,LV_OPA_COVER,0);
     lv_obj_set_style_radius(badge_,5,0);
     lv_obj_set_style_pad_ver(badge_,3,0);
-    body_=lv_obj_create(root);
-    lv_obj_remove_style_all(body_);
-    lv_obj_set_pos(body_,0,46);
-    lv_obj_set_size(body_,240,274);
-    lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);
     build();
     splashStarted_ = lv_tick_get();
 }
@@ -140,6 +140,9 @@ void UIManager::rows(unsigned count,int firstY,int step) {
 }
 void UIManager::build() {
     lv_obj_clean(body_);
+    const lv_coord_t top = screen_==Screen::Splash ? 0 : 46;
+    lv_obj_set_pos(body_,0,top);
+    lv_obj_set_size(body_,240,320-top);
     rebuild_=false;
     if (screen_!=Screen::Splash) {
         const bool home = screen_==Screen::Home;

@@ -28,7 +28,8 @@ if(LVGL_DIR)
     target_compile_definitions(lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE _CRT_SECURE_NO_WARNINGS)
     add_executable(test_ui test_ui.cpp "${ROOT}/lib/PanelUI/src/UIManager.cpp"
                             "${ROOT}/lib/PanelUI/src/tv4_text_15.c"
-                            "${ROOT}/lib/PanelUI/src/tv4_title_23.c")
+                            "${ROOT}/lib/PanelUI/src/tv4_title_23.c"
+                            "${ROOT}/lib/PanelUI/src/tv4_splash_motorcycle.c")
     target_compile_features(test_ui PRIVATE c_std_11)
     target_include_directories(test_ui PRIVATE "${ROOT}/lib/PanelUI/src")
     target_link_libraries(test_ui PRIVATE lvgl core)
