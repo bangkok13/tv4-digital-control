@@ -65,29 +65,32 @@ int main(int argc,char** argv) {
     advance();
     require(ui.screen()==Screen::Splash && flushes>0 && has(lv_scr_act(),"6 VOLT") &&
             has(lv_scr_act(),"GARAGE") && has(lv_scr_act(),"С ДР, БРО!") &&
-            has(lv_scr_act(),"DEMO") && !has(lv_scr_act(),"1250"),"birthday splash at boot");
+            has(lv_scr_act(),"D") && !has(lv_scr_act(),"1250"),"birthday splash at boot");
     if (argc>=3) capture(argv[2]);
     state.settings.mode=Mode::Live; advance();
-    require(has(lv_scr_act(),"LIVE") && !has(lv_scr_act(),"DEMO"),"saved mode badge on splash");
+    require(has(lv_scr_act(),"L") && !has(lv_scr_act(),"D"),"saved mode badge on splash");
     state.settings.mode=Mode::Demo;
     require(tap(50,285).action==Action::None && ui.screen()==Screen::Splash,"touch during splash");
     point={50,285}; down=true; advance();
-    lv_tick_inc(1999-lv_tick_elaps(splashStart));
+    lv_tick_inc(6999-lv_tick_elaps(splashStart));
     ui.update(state);
-    require(!ui.needsUpdate() && ui.screen()==Screen::Splash,"splash remains through 1999 ms");
+    require(!ui.needsUpdate() && ui.screen()==Screen::Splash,"splash remains through 6999 ms");
     lv_tick_inc(1);
-    require(ui.needsUpdate(),"transition due at 2000 ms");
+    require(ui.needsUpdate(),"transition due at 7000 ms");
     advance();
     down=false; advance();
     require(ui.take().action==Action::None && ui.screen()==Screen::Home &&
-            has(lv_scr_act(),"TV-4 DIGITAL") && !has(lv_scr_act(),"GARAGE"),"home after held boot touch");
-    require(flushes>0 && has(lv_scr_act(),"1250") && has(lv_scr_act(),"DEMO"),"demo tachometer");
+            has(lv_scr_act(),"TV-4 Шкильнык") && !has(lv_scr_act(),"GARAGE"),"home after held boot touch");
+    require(flushes>0 && has(lv_scr_act(),"1250") && has(lv_scr_act(),"D"),"demo tachometer");
     if (argc>=2) capture(argv[1]);
-    tap(170,285); require(ui.screen()==Screen::Stats && has(lv_scr_act(),"Пуски"),"stats");
+    tap(170,285); require(ui.screen()==Screen::Stats && has(lv_scr_act(),"Пуски") &&
+                          has(lv_scr_act(),"TV-4 DIGITAL") && !has(lv_scr_act(),"TV-4 Шкильнык"),"stats");
     tap(170,285); require(ui.screen()==Screen::ConfirmReset,"reset asks first");
     require(tap(50,285).action==Action::None && ui.screen()==Screen::Stats,"cancel reset");
     tap(170,285); require(tap(170,285).action==Action::Reset,"confirmed reset");
-    tap(50,285); tap(50,285); require(ui.screen()==Screen::Settings,"settings");
+    tap(50,285); tap(50,285);
+    require(ui.screen()==Screen::Settings && has(lv_scr_act(),"D") &&
+            has(lv_scr_act(),"Сменить DEMO / LIVE"),"settings mode control and badge");
     require(tap(120,88).action==Action::ToggleMode,"mode control");
     for (unsigned i=0;i<unsigned(Field::Count);++i) {
         const auto plus=tap(206,185);
@@ -100,14 +103,15 @@ int main(int argc,char** argv) {
     tap(170,285); require(has(lv_scr_act(),"Не подключено"),"disconnected Modbus");
     tap(50,285); tap(50,285);
     state.settings.mode=Mode::Live; state.motion={}; advance();
-    require(has(lv_scr_act(),"LIVE") && has(lv_scr_act(),"Н/Д"),"live without sensor");
+    require(has(lv_scr_act(),"L") && !has(lv_scr_act(),"D") && has(lv_scr_act(),"Н/Д") &&
+            has(lv_scr_act(),"TV-4 Шкильнык"),"live without sensor");
     lv_mem_monitor_t start{}, end{};
     // Warm each view before comparing the allocator's steady-state usage.
     tap(50,285); tap(50,285); lv_mem_monitor(&start);
     for (unsigned i=0;i<300;++i) {
         tap(50,285); tap(170,285); tap(170,285); tap(50,285); tap(50,285);
         tap(170,285); tap(50,285);
-        require(ui.screen()==Screen::Home && has(lv_scr_act(),"LIVE"),"navigation cycle");
+        require(ui.screen()==Screen::Home && has(lv_scr_act(),"L"),"navigation cycle");
     }
     lv_mem_monitor(&end);
     require(end.free_size+256>=start.free_size,"LVGL heap stable");

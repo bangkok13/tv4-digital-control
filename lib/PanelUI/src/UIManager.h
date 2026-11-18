@@ -29,7 +29,7 @@ private:
     Field field_ = Field::Brightness;
     bool rebuild_ = true, secondPage_ = false, fieldChanged_ = false, resetError_ = false;
     Command pending_{};
-    lv_obj_t *body_ = nullptr, *badge_ = nullptr, *rpm_ = nullptr, *unit_ = nullptr,
+    lv_obj_t *body_ = nullptr, *title_ = nullptr, *badge_ = nullptr, *rpm_ = nullptr, *unit_ = nullptr,
              *bar_ = nullptr, *signal_ = nullptr, *time_ = nullptr, *limit_ = nullptr,
              *value_ = nullptr, *fieldName_ = nullptr, *confirm_ = nullptr, *activity_ = nullptr;
     lv_obj_t* rowLabels_[6]{};

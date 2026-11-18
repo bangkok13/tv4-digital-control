@@ -8,7 +8,7 @@ namespace tv4 {
 namespace {
 constexpr uint32_t bg=0x111820, surface=0x23313e, white=0xf1f6fa, muted=0xa9b9c5,
                    blue=0x65cff5, green=0x7ad69b, amber=0xf6c662, red=0xff7878;
-constexpr uint32_t splashDurationMs = 2000;
+constexpr uint32_t splashDurationMs = 7000;
 lv_color_t color(uint32_t c) { return lv_color_hex(c); }
 lv_obj_t* label(lv_obj_t* parent, const char* text, int x, int y, int w,
                 uint32_t ink=white, lv_text_align_t align=LV_TEXT_ALIGN_LEFT,
@@ -73,7 +73,8 @@ void UIManager::begin() {
     lv_obj_set_style_bg_color(root,color(bg),0);
     lv_obj_set_style_bg_opa(root,LV_OPA_COVER,0);
     lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
-    badge_=label(root,"",166,10,62,amber,LV_TEXT_ALIGN_CENTER);
+    title_=label(root,"",12,12,151);
+    badge_=label(root,"",200,10,28,amber,LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_bg_color(badge_,color(surface),0);
     lv_obj_set_style_bg_opa(badge_,LV_OPA_COVER,0);
     lv_obj_set_style_radius(badge_,5,0);
@@ -137,6 +138,11 @@ void UIManager::rows(unsigned count,int firstY,int step) {
 void UIManager::build() {
     lv_obj_clean(body_);
     rebuild_=false;
+    if (screen_!=Screen::Splash) {
+        const bool home = screen_==Screen::Home;
+        set(title_,home ? "TV-4 Шкильнык" : "TV-4 DIGITAL");
+        lv_obj_set_style_text_font(title_,home ? &tv4_text_15 : &lv_font_montserrat_20,0);
+    }
     switch(screen_) {
     case Screen::Splash:
         drawSplash(body_);
@@ -229,14 +235,11 @@ void UIManager::renderRows(const MachineState& s) {
     }
 }
 void UIManager::update(const MachineState& s) {
-    if (splashExpired()) {
-        label(lv_obj_get_parent(body_), "TV-4 DIGITAL", 12, 12, 151, white, LV_TEXT_ALIGN_LEFT, &lv_font_montserrat_20);
-        navigate(Key::Home);
-    }
+    if (splashExpired()) navigate(Key::Home);
     if (rebuild_) build();
     fieldChanged_=false;
     const bool demo=s.settings.mode==Mode::Demo;
-    set(badge_,demo ? "DEMO" : "LIVE"); ink(badge_,demo ? amber : green);
+    set(badge_,demo ? "D" : "L"); ink(badge_,demo ? amber : green);
     char buf[80];
     switch(screen_) {
     case Screen::Splash: break;

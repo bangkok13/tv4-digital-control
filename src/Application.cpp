@@ -22,7 +22,7 @@ void Application::configureCapture() {
     rpm_.restart();
 }
 void Application::startCalibration() {
-    if (displayReady_) calibration_.start(state_.settings.mode==Mode::Demo ? "DEMO" : "LIVE");
+    if (displayReady_) calibration_.start(state_.settings.mode==Mode::Demo ? "D" : "L");
 }
 void Application::apply(Command cmd,uint64_t now) {
     auto& settings=state_.settings;
