@@ -1,6 +1,7 @@
 #include <Calibration.h>
 #include <DemoService.h>
 #include <Journal.h>
+#include <Maintenance.h>
 #include <RPMService.h>
 #include <cstdio>
 #include <cstdlib>
@@ -67,6 +68,8 @@ void thresholdAndLongRun() {
     b.rpm.pulse(100); b.rpm.pulse(12000100);
     CHECK(near(b.rpm.motion().rpm,5) && !b.rpm.motion().rotating); CHECK(!b.stats.dirty());
     CHECK(saturatedSum(UINT64_MAX-2,8)==UINT64_MAX);
+    StatisticsService lifetime;lifetime.interval(UINT64_MAX,6000);
+    CHECK(lifetime.totals().runningUs==UINT64_MAX&&lifetime.totals().rpmTime==UINT64_MAX);
     Bench fast; fast.cfg.values[unsigned(Field::Pulses)]=32; fast.rpm.configure(fast.cfg);
     uint64_t t=8000000000000ULL; fast.rpm.pulse(t);
     for (unsigned i=0;i<2000000;++i) fast.rpm.pulse(t+=1250);
@@ -125,9 +128,35 @@ void touchAndDemo() {
     }
     CHECK(demo.stats().totals().runningUs>7200000000ULL);
     demo.resetStats(); CHECK(demo.stats().totals().runningUs==0);
+    demo.manual(250);demo.tick(40100000,cfg);CHECK(near(demo.motion().rpm,250));
+    demo.manual(0);demo.tick(40200000,cfg);CHECK(!demo.motion().rotating);
+}
+void workshopAndGraphs() {
+    CHECK(!inputQuietForUpdate(5000000,0,false));CHECK(inputQuietForUpdate(5000001,0,false));
+    CHECK(!inputQuietForUpdate(90000000,30000000,false));CHECK(inputQuietForUpdate(95000001,30000000,false));
+    CHECK(!inputQuietForUpdate(100000000,30000000,true));CHECK(!inputQuietForUpdate(5,10,false));
+    CHECK(near(*turningRpm(20,100),1591.54943));CHECK(near(*cuttingSpeed(20,1000),62.83185));
+    CHECK(near(*feedTravel(.12,710),85.2));CHECK(!turningRpm(0,5));CHECK(!cuttingSpeed(10,NAN));CHECK(!feedTravel(-.1,50));
+    CHECK(supportedPitch(80)&&supportedPitch(100)&&supportedPitch(125)&&!supportedPitch(150));
+    const auto g=threadGeometry(10,1.25);CHECK(g && near(g->height,1.08253)&&near(g->pitchDiameter,9.1881));
+    CHECK(near(g->externalRoot,8.4664)&&near(g->internalMinor,8.6468)&&near(g->drill,8.75));CHECK(!threadGeometry(1,2));
+    auto p=roughing(30,20,1,.2);CHECK(p && p->rough==5 && near(p->radialRemoval,5)&&near(p->finishing,.2));
+    CHECK(roughing(20,20,1,0)->rough==0);CHECK(!roughing(20,22,1,0));CHECK(!roughing(22,20,0,0));CHECK(!roughing(22,20,1,2));
+    CHECK(parseInput(Input::Pitch,"1,25")==125);CHECK(!parseInput(Input::Pitch,"1.254"));CHECK(!parseInput(Input::Pitch,"-1"));
+    CHECK(!parseInput(Input::Diameter,"655.36"));CHECK(!parseInput(Input::Diameter,"nan"));CHECK(parseInput(Input::Depth,".02")==2);
+    RpmHistory h; CHECK(!h.view(30,0).count);
+    for(unsigned i=0;i<650;++i)h.sample(i*1000000ULL,i!=640,double(i));
+    auto slice=h.view(30,649000000);CHECK(slice.width==30&&slice.count==29&&slice.minimum==620&&slice.maximum==649);
+    CHECK(slice.points[20]==-1 && near(slice.mean,(30*634.5-640)/29));
+    CHECK(h.view(120,649000000).count==119&&h.view(600,649000000).count==599);
+    h.sample(2000000000ULL,true,0);slice=h.view(600,2000000000ULL);CHECK(slice.count==1 && !slice.minimum);
+    StatisticsService s;s.interval(100000,600);s.endRun();s.interval(200000,300);
+    auto saved=s.snapshot(12345);StatisticsService boot;boot.restoreLog(saved);
+    CHECK(boot.recent()[0].us==200000&&boot.recent()[1].peak==600&&!boot.sessionUs());
+    CHECK(boot.totals().starts==2&&boot.snapshot(23456).poweredUs==23456);
 }
 }
 int main() {
-    steadyNoiseAndStop(); slowAndMultipleTargets(); thresholdAndLongRun(); journalRecovery(); touchAndDemo();
+    steadyNoiseAndStop(); slowAndMultipleTargets(); thresholdAndLongRun(); journalRecovery(); touchAndDemo();workshopAndGraphs();
     std::printf("OK: %u checks, including 2,000,000 pulse intervals\n",checks);
 }

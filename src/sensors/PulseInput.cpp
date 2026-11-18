@@ -7,6 +7,7 @@ void IRAM_ATTR PulseInput::edge(void* arg) {
     auto& in=*static_cast<PulseInput*>(arg);
     const auto time=esp_timer_get_time();
     portENTER_CRITICAL_ISR(&in.lock_);
+    in.physicalEdge_=time;
     const unsigned next=(in.write_+1)%capacity;
     if (next==in.read_) {
         if (in.dropped_!=UINT32_MAX) ++in.dropped_;
@@ -15,6 +16,12 @@ void IRAM_ATTR PulseInput::edge(void* arg) {
         in.write_=next;
     }
     portEXIT_CRITICAL_ISR(&in.lock_);
+}
+uint64_t PulseInput::lastPhysicalEdge() {
+    portENTER_CRITICAL(&lock_); const uint64_t t=physicalEdge_; portEXIT_CRITICAL(&lock_);return t;
+}
+void PulseInput::clearQueue() {
+    portENTER_CRITICAL(&lock_);read_=write_;dropped_=0;portEXIT_CRITICAL(&lock_);
 }
 void PulseInput::setEnabled(bool enabled) {
     if (enabled_) detachInterrupt(board::rpmInput);

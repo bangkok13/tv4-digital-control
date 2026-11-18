@@ -1,5 +1,6 @@
 #include "DiagnosticsService.h"
 #include <esp_system.h>
+#include <esp_ota_ops.h>
 
 namespace tv4 {
 namespace {
@@ -25,6 +26,8 @@ void DiagnosticsService::begin(Diagnostics& d) {
     d.revision=ESP.getChipRevision(); d.flashBytes=ESP.getFlashChipSize();
     Serial.printf("[boot] TV-4 %s, %s rev %u, flash %u, reset %s\n",
         board::version,d.chip,d.revision,d.flashBytes,d.resetReason);
+    if (const auto* slot=esp_ota_get_running_partition())
+        Serial.printf("[boot] slot=%s offset=0x%x bytes=%u\n",slot->label,unsigned(slot->address),unsigned(slot->size));
 }
 void DiagnosticsService::tick(MachineState& s,const TouchManager& touch,bool storageOK) {
     if (s.uptimeUs<nextSample_) return;
@@ -35,8 +38,8 @@ void DiagnosticsService::tick(MachineState& s,const TouchManager& touch,bool sto
     d.storageOK=storageOK;
     if (s.uptimeUs<nextLog_) return;
     nextLog_=s.uptimeUs+10000000;
-    Serial.printf("[%s] heap=%u min=%u signal=%u pulses=%llu reject=%llu lost=%llu NVS=%s\n",
+    Serial.printf("[%s] heap=%u min=%u signal=%u pulses=%llu reject=%llu lost=%llu NVS=%s cal=%u\n",
         s.settings.mode==Mode::Demo ? "DEMO" : "LIVE",d.freeHeap,d.minHeap,
-        unsigned(s.motion.signal),s.motion.pulses,s.motion.rejected,s.motion.lost,storageOK ? "ok" : "error");
+        unsigned(s.motion.signal),s.motion.pulses,s.motion.rejected,s.motion.lost,storageOK ? "ok" : "error",unsigned(d.calibrated));
 }
 }

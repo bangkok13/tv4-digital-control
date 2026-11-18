@@ -17,6 +17,7 @@ void DemoService::tick(uint64_t now, const Settings& settings) {
     else if (t < 16) rpm = 1500;
     else if (t < 26) rpm = 1375 + 125*std::cos((t-16)*0.628318530718);
     else if (t < 34) rpm = 1500*(34-t)/8;
+    if (target_>=0) rpm=target_;
     motion_.rpm = rpm;
     motion_.hasRpm = true;
     motion_.rotating = rpm >= settings.get(Field::Threshold);

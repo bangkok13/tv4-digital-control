@@ -3,6 +3,8 @@
 #include <cmath>
 #include <cstdint>
 #include <optional>
+#include "Workshop.h"
+#include "RpmHistory.h"
 
 namespace tv4 {
 enum class Mode : uint8_t { Demo, Live };
@@ -60,6 +62,23 @@ struct Diagnostics {
     char chip[32] = "", resetReason[28] = "";
     bool touchBus = false, touchSeen = false, calibrated = false, storageOK = true;
 };
+struct Operation { uint64_t us=0; uint32_t peak=0, reserved=0; };
+struct RunLog {
+    Totals totals{};
+    Operation recent[4]{}, active{};
+    uint64_t poweredUs=0;
+    bool valid() const {
+        if (!totals.valid() || active.peak>6000) return false;
+        for (const auto& op:recent) if (op.peak>6000) return false;
+        return true;
+    }
+};
+struct NetworkInfo {
+    char ssid[33]{}, ip[16]{}, apName[24]{}, apKey[20]{}, adminKey[22]{};
+    int rssi=0, progress=0;
+    bool connected=false, portal=false, armed=false, updating=false;
+    char status[64]="Wi-Fi выключен";
+};
 struct MachineState {
     Settings settings{};
     Measurement motion{};
@@ -67,6 +86,12 @@ struct MachineState {
     uint64_t uptimeUs = 0, sessionUs = 0;
     Diagnostics diagnostic{};
     DriveTelemetry drive{};
+    Workshop workshop{};
+    const RpmHistory* history=nullptr;
+    Operation recent[4]{};
+    uint64_t poweredUs=0;
+    int demoTarget=-1;
+    NetworkInfo network{};
 };
 inline uint64_t saturatedSum(uint64_t a, uint64_t b) {
     return UINT64_MAX-a < b ? UINT64_MAX : a+b;

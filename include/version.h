@@ -1,2 +1,2 @@
 #pragma once
-#define TV4_VERSION "1.0.4"
+#define TV4_VERSION "2.0.0"

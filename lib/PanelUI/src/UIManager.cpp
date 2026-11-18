@@ -5,7 +5,6 @@
 
 extern "C" {
 LV_FONT_DECLARE(tv4_text_15);
-LV_FONT_DECLARE(tv4_title_23);
 LV_IMG_DECLARE(tv4_splash_motorcycle);
 }
 namespace tv4 {
@@ -81,8 +80,8 @@ void UIManager::begin() {
     body_=lv_obj_create(root);
     lv_obj_remove_style_all(body_);
     lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);
-    title_=label(root,"",12,12,184);
-    badge_=label(root,"",200,10,28,amber,LV_TEXT_ALIGN_CENTER);
+    title_=label(root,"",12,10,166);
+    badge_=label(root,"",177,10,55,amber,LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_bg_color(badge_,color(surface),0);
     lv_obj_set_style_bg_opa(badge_,LV_OPA_COVER,0);
     lv_obj_set_style_radius(badge_,5,0);
@@ -115,7 +114,7 @@ void UIManager::navigate(Key key) {
     case Key::Home: screen_=Screen::Home; break;
     case Key::Settings: screen_=Screen::Settings; break;
     case Key::Stats: screen_=Screen::Stats; break;
-    case Key::Diagnostics: screen_=Screen::Diagnostics; secondPage_=false; break;
+    case Key::Diagnostics: screen_=Screen::Diagnostics; diagnosticPage_=0; break;
     case Key::Confirm: origin_=screen_; screen_=Screen::ConfirmReset; resetError_=false; break;
     case Key::Cancel: screen_=origin_; break;
     case Key::Yes: pending_={Action::Reset,field_}; screen_=origin_; break;
@@ -124,7 +123,8 @@ void UIManager::navigate(Key key) {
     case Key::Dec: pending_={Action::Decrease,field_}; return;
     case Key::Cal: pending_={Action::Calibrate,field_}; return;
     case Key::FieldNext: field_=static_cast<Field>((unsigned(field_)+1)%unsigned(Field::Count)); fieldChanged_=true; return;
-    case Key::More: secondPage_=!secondPage_; break;
+    case Key::More: diagnosticPage_=(diagnosticPage_+1)%3; break;
+    default: workshopKey(key); return;
     }
     rebuild_=true;
 }
@@ -145,10 +145,8 @@ void UIManager::build() {
     lv_obj_set_size(body_,240,320-top);
     rebuild_=false;
     if (screen_!=Screen::Splash) {
-        const bool home = screen_==Screen::Home;
-        set(title_,home ? "TV-4 Шкильнык" : "TV-4 DIGITAL");
-        lv_obj_set_y(title_,home ? 7 : 12);
-        lv_obj_set_style_text_font(title_,home ? &tv4_title_23 : &lv_font_montserrat_20,0);
+        set(title_,"TV-4 DIGITAL");
+        lv_obj_set_style_text_font(title_,&lv_font_montserrat_20,0);
     }
     switch(screen_) {
     case Screen::Splash:
@@ -168,13 +166,13 @@ void UIManager::build() {
         limit_=label(body_,"",136,116,92,muted,LV_TEXT_ALIGN_RIGHT);
         activity_=lv_obj_create(body_);
         lv_obj_remove_style_all(activity_);
-        lv_obj_set_pos(activity_,13,157); lv_obj_set_size(activity_,10,10);
+        lv_obj_set_pos(activity_,13,147); lv_obj_set_size(activity_,10,10);
         lv_obj_set_style_radius(activity_,LV_RADIUS_CIRCLE,0);
         lv_obj_set_style_bg_opa(activity_,LV_OPA_COVER,0);
-        signal_=label(body_,"",32,151,196,green);
-        label(body_,"Сеанс",12,185,80,muted);
-        time_=label(body_,"",92,185,136,white,LV_TEXT_ALIGN_RIGHT);
-        button(Key::Settings,"Настройки",10,220,106,44,surface);
+        signal_=label(body_,"",30,140,200,green);
+        value_=label(body_,"",12,165,216);
+        time_=label(body_,"",12,190,216,muted);
+        button(Key::Menu,"Меню",10,220,106,44,0x235268);
         button(Key::Stats,"Статистика",122,220,108,44,surface);
         break;
     case Screen::Settings:
@@ -184,22 +182,23 @@ void UIManager::build() {
         button(Key::Dec,"−",10,118,49,42,surface);
         value_=label(body_,"",63,129,114,white,LV_TEXT_ALIGN_CENTER);
         button(Key::Inc,"+",181,118,49,42,surface);
-        button(Key::Confirm,"Сброс статистики",10,170,220,40,0x493137);
-        button(Key::Home,"Главная",10,220,96,44,surface);
+        button(Key::SettingsExtra,"Ещё настройки",10,170,220,40,surface);
+        button(Key::Menu,"Меню",10,220,96,44,surface);
         button(Key::Diagnostics,"Диагностика",112,220,118,44,surface);
         break;
     case Screen::Stats:
         label(body_,"Статистика вращения",12,0,216,blue);
-        rows(5,36,34);
+        rows(5,27,28);
+        button(Key::History,"История операций",10,170,220,39,surface);
         button(Key::Home,"Главная",10,220,106,44,surface);
         button(Key::Confirm,"Сбросить",122,220,108,44,0x493137);
         break;
     case Screen::Diagnostics:
-        label(body_,secondPage_ ? "Диагностика  2/2" : "Диагностика  1/2",12,0,216,blue);
+        label(body_,diagnosticPage_==0 ? "Диагностика  1/3" : diagnosticPage_==1 ? "Диагностика  2/3" : "Диагностика  3/3",12,0,216,blue);
         rows(6,28,23);
         button(Key::Cal,"Калибровка тача",10,170,220,40,surface);
         button(Key::Settings,"Назад",10,220,106,44,surface);
-        button(Key::More,secondPage_ ? "Стр. 1" : "Стр. 2",122,220,108,44,surface);
+        button(Key::More,"Далее",122,220,108,44,surface);
         break;
     case Screen::ConfirmReset:
         label(body_,"Сброс статистики",12,12,216,red);
@@ -208,6 +207,7 @@ void UIManager::build() {
         button(Key::Cancel,"Отмена",10,220,106,44,surface);
         button(Key::Yes,"Сбросить",122,220,108,44,0x713a40);
         break;
+    default: buildWorkshop(); break;
     }
 }
 void UIManager::renderRows(const MachineState& s) {
@@ -222,14 +222,14 @@ void UIManager::renderRows(const MachineState& s) {
         std::snprintf(val,sizeof(val),"%u RPM",unsigned(s.totals.peakRpm)); row(2,"Максимум",s.totals.runningUs ? val : "Н/Д");
         std::snprintf(val,sizeof(val),"%.0f RPM",s.totals.average()); row(3,"Среднее",s.totals.runningUs ? val : "Н/Д");
         number(val,sizeof(val),s.totals.starts); row(4,"Пуски",val);
-    } else if (!secondPage_) {
+    } else if (!diagnosticPage_) {
         row(0,"Чип",d.chip);
         number(val,sizeof(val),d.revision); row(1,"Ревизия ESP",val);
         std::snprintf(val,sizeof(val),"%u / %u КБ",unsigned(d.freeHeap/1024),unsigned(d.minHeap/1024)); row(2,"ОЗУ / мин.",val);
         std::snprintf(val,sizeof(val),"%u КБ",unsigned(d.flashBytes/1024)); row(3,"Flash",val);
         duration(val,sizeof(val),s.uptimeUs); row(4,"Аптайм",val);
         row(5,"Сброс",d.resetReason);
-    } else {
+    } else if (diagnosticPage_==1) {
         row(0,"Тач",!d.touchBus ? "Ошибка SPI" : d.touchSeen ? (d.calibrated ? "Калиброван" : "Есть отклик") : "Нет касаний");
         const char* rpmState = s.motion.signal==Signal::Tracking ? "Импульсы" :
               s.motion.signal==Signal::Overrun ? "Потеря" : s.motion.signal==Signal::FirstPulse ? "Первый" : "Нет данных";
@@ -239,14 +239,24 @@ void UIManager::renderRows(const MachineState& s) {
         row(4,"NVS",d.storageOK ? "Готово" : "Ошибка");
         ink(rowValues_[4],d.storageOK ? white : red);
         row(5,"Прошивка",TV4_VERSION);
+    } else {
+        std::snprintf(val,sizeof(val),"%llu с",(unsigned long long)((s.uptimeUs-std::min(s.uptimeUs,s.motion.lastEdgeUs))/1000000));
+        row(0,"После фронта",s.motion.pulses?val:"Н/Д");
+        std::snprintf(val,sizeof(val),"%llu / %llu",(unsigned long long)s.motion.rejected,(unsigned long long)s.motion.lost);
+        row(1,"Шум / потери",val);
+        row(2,"IP",s.network.connected||s.network.portal?s.network.ip:"Н/Д");
+        std::snprintf(val,sizeof(val),"%d dBm",s.network.rssi);row(3,"RSSI",s.network.connected?val:"Н/Д");
+        row(4,"OTA",s.network.updating?"Запись":s.network.armed?"Открыто":"Закрыто");
+        row(5,"microSD","Не требуется");
     }
 }
 void UIManager::update(const MachineState& s) {
+    state_=&s;
     if (splashExpired()) navigate(Key::Home);
     if (rebuild_) build();
     fieldChanged_=false;
     const bool demo=s.settings.mode==Mode::Demo;
-    set(badge_,demo ? "D" : "L"); ink(badge_,demo ? amber : green);
+    set(badge_,demo ? "DEMO" : "LIVE"); ink(badge_,demo ? amber : green);
     char buf[80];
     switch(screen_) {
     case Screen::Splash: break;
@@ -260,12 +270,17 @@ void UIManager::update(const MachineState& s) {
         if (lv_bar_get_max_value(bar_)!=scale) lv_bar_set_range(bar_,0,scale);
         lv_bar_set_value(bar_,s.motion.hasRpm ? std::min<int>(std::lround(s.motion.rpm),scale) : 0,LV_ANIM_OFF);
         std::snprintf(buf,sizeof(buf),"%d RPM",scale); set(limit_,buf);
-        set(signal_,demo ? (s.motion.rotating ? "Симуляция вращения" : "Пауза симуляции") : signalText(s.motion.signal));
+        set(signal_,demo ? (s.motion.rotating ? "Вращение DEMO" : "Пауза DEMO") :
+            s.motion.hasRpm ? (s.motion.rotating ? "Вращение: импульсы" : "Импульсы ниже порога") : signalText(s.motion.signal));
         ink(signal_,s.motion.signal==Signal::Overrun ? red : s.motion.rotating ? green : amber);
         const bool recent=s.motion.pulses && s.uptimeUs>=s.motion.lastEdgeUs && s.uptimeUs-s.motion.lastEdgeUs<180000;
         const auto dot=color(recent ? green : surface);
         if (lv_obj_get_style_bg_color(activity_,LV_PART_MAIN).full!=dot.full) lv_obj_set_style_bg_color(activity_,dot,0);
-        duration(buf,sizeof(buf),s.uptimeUs); set(time_,buf);
+        const auto vc= s.motion.hasRpm ? cuttingSpeed(s.workshop.mm(Input::Diameter),s.motion.rpm) : std::nullopt;
+        char speed[24]="Н/Д",elapsed[28]; if (vc) std::snprintf(speed,sizeof(speed),"%.1f",*vc);
+        std::snprintf(buf,sizeof(buf),"D %.2f мм  /  %s м/мин",s.workshop.mm(Input::Diameter),speed); set(value_,buf);
+        duration(elapsed,sizeof(elapsed),s.sessionUs);
+        std::snprintf(buf,sizeof(buf),"Опер. %s   Wi-Fi %s",elapsed,s.network.connected ? "STA" : s.network.portal ? "AP" : "нет"); set(time_,buf);
         break;
     }
     case Screen::Settings: {
@@ -279,6 +294,19 @@ void UIManager::update(const MachineState& s) {
         set(confirm_,resetError_ ? "Ошибка записи NVS. Статистика сохранена в памяти. Повторить сброс?" :
             demo ? "Обнулить демонстрационные значения?" : "Обнулить записанные моточасы, максимум и число пусков LIVE?");
         break;
+    default: renderWorkshop(s); break;
     }
 }
+lv_obj_t* UIManager::caption(const char* t,int x,int y,int w,uint32_t c,bool wrap) {
+    auto* obj=label(body_,t,x,y,w,c);
+    if (wrap) lv_label_set_long_mode(obj,LV_LABEL_LONG_WRAP);
+    return obj;
+}
+void UIManager::dataRows(unsigned count,int y,int step) {
+    for (unsigned i=0;i<count;++i) {
+        rowLabels_[i]=label(body_,"",10,y+int(i)*step,119,muted);
+        rowValues_[i]=label(body_,"",129,y+int(i)*step,101,white,LV_TEXT_ALIGN_RIGHT);
+    }
+}
+void UIManager::put(unsigned i,const char* n,const char* v) { set(rowLabels_[i],n); set(rowValues_[i],v); }
 }

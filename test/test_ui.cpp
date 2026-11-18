@@ -65,10 +65,10 @@ int main(int argc,char** argv) {
     advance();
     require(ui.screen()==Screen::Splash && flushes>0 && has(lv_scr_act(),"6 VOLT") &&
             has(lv_scr_act(),"GARAGE") && has(lv_scr_act(),"С ДР, БРО!") &&
-            has(lv_scr_act(),"D") && !has(lv_scr_act(),"1250"),"birthday splash at boot");
+            has(lv_scr_act(),"DEMO") && !has(lv_scr_act(),"1250"),"birthday splash at boot");
     if (argc>=3) capture(argv[2]);
     state.settings.mode=Mode::Live; advance();
-    require(has(lv_scr_act(),"L") && !has(lv_scr_act(),"D"),"saved mode badge on splash");
+    require(has(lv_scr_act(),"LIVE") && !has(lv_scr_act(),"DEMO"),"saved mode badge on splash");
     state.settings.mode=Mode::Demo;
     require(tap(50,285).action==Action::None && ui.screen()==Screen::Splash,"touch during splash");
     point={50,285}; down=true; advance();
@@ -80,18 +80,20 @@ int main(int argc,char** argv) {
     advance();
     down=false; advance();
     require(ui.take().action==Action::None && ui.screen()==Screen::Home &&
-            has(lv_scr_act(),"TV-4 Шкильнык") && !has(lv_scr_act(),"GARAGE"),"home after held boot touch");
-    require(flushes>0 && has(lv_scr_act(),"1250") && has(lv_scr_act(),"D"),"demo tachometer");
+            has(lv_scr_act(),"TV-4 DIGITAL") && !has(lv_scr_act(),"GARAGE"),"home after held boot touch");
+    require(flushes>0 && has(lv_scr_act(),"1250") && has(lv_scr_act(),"DEMO"),"demo tachometer");
     if (argc>=2) capture(argv[1]);
     tap(170,285); require(ui.screen()==Screen::Stats && has(lv_scr_act(),"Пуски") &&
                           has(lv_scr_act(),"TV-4 DIGITAL") && !has(lv_scr_act(),"TV-4 Шкильнык"),"stats");
     tap(170,285); require(ui.screen()==Screen::ConfirmReset,"reset asks first");
     require(tap(50,285).action==Action::None && ui.screen()==Screen::Stats,"cancel reset");
     tap(170,285); require(tap(170,285).action==Action::Reset,"confirmed reset");
-    tap(50,285); tap(50,285);
-    require(ui.screen()==Screen::Settings && has(lv_scr_act(),"D") &&
+    tap(50,285); tap(50,285); tap(170,244);
+    require(ui.screen()==Screen::Settings && has(lv_scr_act(),"DEMO") &&
             has(lv_scr_act(),"Сменить DEMO / LIVE"),"settings mode control and badge");
     require(tap(120,88).action==Action::ToggleMode,"mode control");
+    tap(120,237);require(ui.screen()==Screen::SettingsExtra && has(lv_scr_act(),"Последняя резьба"),"workshop settings");
+    tap(50,285);require(ui.screen()==Screen::Settings,"return to basic settings");
     for (unsigned i=0;i<unsigned(Field::Count);++i) {
         const auto plus=tap(206,185);
         require(plus.action==Action::Increase && unsigned(plus.field)==i,"parameter +");
@@ -101,17 +103,41 @@ int main(int argc,char** argv) {
     tap(170,285); require(ui.screen()==Screen::Diagnostics,"diagnostics");
     require(tap(120,238).action==Action::Calibrate,"calibration entry");
     tap(170,285); require(has(lv_scr_act(),"Не подключено"),"disconnected Modbus");
-    tap(50,285); tap(50,285);
+    tap(50,285); tap(50,285);tap(50,285);
     state.settings.mode=Mode::Live; state.motion={}; advance();
-    require(has(lv_scr_act(),"L") && !has(lv_scr_act(),"D") && has(lv_scr_act(),"Н/Д") &&
-            has(lv_scr_act(),"TV-4 Шкильнык"),"live without sensor");
+    require(has(lv_scr_act(),"LIVE") && !has(lv_scr_act(),"DEMO") && has(lv_scr_act(),"Н/Д") &&
+            has(lv_scr_act(),"TV-4 DIGITAL"),"live without sensor");
+    tap(50,285);tap(170,126);require(ui.screen()==Screen::Thread,"thread menu");
+    tap(170,285);tap(100,111);require(ui.screen()==Screen::Number,"pitch keyboard");
+    tap(40,113);tap(40,234);tap(120,113);tap(120,153);const auto edit=tap(170,285);
+    require(edit.action==Action::SetInput&&edit.input==Input::Pitch&&edit.value==125,"enter 1.25");
+    state.workshop.set(edit.input,edit.value);tap(50,285);tap(55,240);require(ui.screen()==Screen::ThreadInfo,"geometry notes");
+    tap(50,285);tap(175,240);require(ui.screen()==Screen::Controls,"thread controls");
+    if (argc>=4) capture(argv[3]);
+    tap(127,151);require(ui.screen()==Screen::ControlCard,"tap numbered lever on the actual drawing");
+    tap(50,285);tap(170,240);tap(170,240);require(has(lv_scr_act(),"Коробка подач"),"enlarged gearbox");
+    tap(42,206);require(ui.screen()==Screen::ControlCard&&has(lv_scr_act(),"Шаг 1.25 мм"),"selected pitch shown on lever card");
+    tap(50,285);tap(50,285);tap(50,285);
+    tap(50,85);require(ui.screen()==Screen::Graphs,"graph view");tap(170,285);require(has(lv_scr_act(),"2 мин"),"graph range");
+    tap(50,285);tap(50,243);require(ui.screen()==Screen::Network,"network menu");
+    tap(170,285);require(ui.screen()==Screen::ConfirmOTA,"maintenance physical confirmation");tap(50,285);tap(50,285);tap(50,285);
+    tap(50,285);tap(50,128);require(ui.screen()==Screen::Turning&&has(lv_scr_act(),"Расчёт RPM"),"turning");
+    tap(50,285);tap(50,162);require(ui.screen()==Screen::Rough&&has(lv_scr_act(),"Черновых"),"roughing");
+    tap(50,285);tap(170,162);require(ui.screen()==Screen::Feed&&has(lv_scr_act(),"Ходовой вал"),"mechanical feed");
+    tap(50,285);tap(170,205);require(ui.screen()==Screen::Demo,"demo slider");
+    state.settings.mode=Mode::Demo;advance();
+    require(tap(170,160).action==Action::DemoSpeed,"slider sends demo target");
+    require(tap(120,225).value==-1,"return to automatic simulation");
+    state.settings.mode=Mode::Live;tap(50,285);tap(170,85);tap(120,232);
+    require(ui.screen()==Screen::History&&has(lv_scr_act(),"Питание всего"),"operation and power history");
+    tap(50,285);tap(50,285);
     lv_mem_monitor_t start{}, end{};
     // Warm each view before comparing the allocator's steady-state usage.
     tap(50,285); tap(50,285); lv_mem_monitor(&start);
     for (unsigned i=0;i<300;++i) {
-        tap(50,285); tap(170,285); tap(170,285); tap(50,285); tap(50,285);
+        tap(50,285);tap(170,244);tap(170,285);tap(170,285);tap(50,285);tap(50,285);tap(50,285);
         tap(170,285); tap(50,285);
-        require(ui.screen()==Screen::Home && has(lv_scr_act(),"L"),"navigation cycle");
+        require(ui.screen()==Screen::Home && has(lv_scr_act(),"LIVE"),"navigation cycle");
     }
     lv_mem_monitor(&end);
     require(end.free_size+256>=start.free_size,"LVGL heap stable");

@@ -7,11 +7,14 @@ class PulseInput {
 public:
     void setEnabled(bool enabled);
     void drain(RPMService& rpm);
+    uint64_t lastPhysicalEdge();
+    void clearQueue();
 private:
     static void IRAM_ATTR edge(void* arg);
     static constexpr unsigned capacity=128;
     portMUX_TYPE lock_=portMUX_INITIALIZER_UNLOCKED;
     uint64_t times_[capacity]{};
+    uint64_t physicalEdge_=0;
     volatile unsigned read_=0, write_=0;
     volatile uint32_t dropped_=0;
     bool enabled_=false;

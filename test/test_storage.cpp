@@ -40,5 +40,16 @@ int main() {
     check(!finalReboot.healthy(),"failed config storage visible");
     Preferences::fail=false; finalReboot.tick(13000001,finalCfg,finalStats);
     check(finalReboot.healthy(),"failed write retried");
+    Preferences::data.clear();NvsStore old;old.open();
+    Journal<Settings> oldConfig(old,"cfg-a","cfg-b",0x53455401);
+    Journal<Totals> oldRun(old,"run-a","run-b",0x52554e01);
+    Settings first;first.mode=Mode::Live;first.values[0]=90;
+    check(oldConfig.save(first)&&oldRun.save({1000000,850000000,1,850,0}),"seed v1");
+    Workshop w;Settings cfg;StatisticsService machine;SettingsService upgrade;upgrade.begin(cfg,machine,&w);
+    check(cfg.mode==Mode::Live&&cfg.get(Field::Brightness)==90&&machine.totals().peakRpm==850,"migrate v1");
+    w.set(Input::Pitch,125);upgrade.edited(1);upgrade.tick(3000000,cfg,machine);
+    machine.interval(100000,600);upgrade.tick(300000000,cfg,machine);
+    Workshop restored;SettingsService again;again.begin(cfg,machine,&restored);
+    check(restored.get(Input::Pitch)==125&&machine.recent()[0].us==100000&&again.powered(2000000)==302000000,"v2 state on restart");
     std::puts("OK: production NVS scheduler, write bounds, retry, reset and recovery on simulated reboot");
 }

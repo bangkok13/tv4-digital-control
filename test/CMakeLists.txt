@@ -9,6 +9,7 @@ endif()
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 set(CORE "${ROOT}/lib/TV4Core/src")
 add_library(core "${CORE}/Calibration.cpp" "${CORE}/DemoService.cpp"
+                 "${CORE}/Workshop.cpp"
                  "${CORE}/RPMService.cpp" "${CORE}/StatisticsService.cpp")
 target_include_directories(core PUBLIC "${CORE}")
 add_executable(test_core test_core.cpp)
@@ -27,6 +28,8 @@ if(LVGL_DIR)
     target_include_directories(lvgl PUBLIC "${LVGL_DIR}" "${ROOT}/include")
     target_compile_definitions(lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE _CRT_SECURE_NO_WARNINGS)
     add_executable(test_ui test_ui.cpp "${ROOT}/lib/PanelUI/src/UIManager.cpp"
+                            "${ROOT}/lib/PanelUI/src/WorkshopViews.cpp"
+                            "${ROOT}/lib/PanelUI/src/tv4_drawings.c"
                             "${ROOT}/lib/PanelUI/src/tv4_text_15.c"
                             "${ROOT}/lib/PanelUI/src/tv4_title_23.c"
                             "${ROOT}/lib/PanelUI/src/tv4_splash_motorcycle.c")

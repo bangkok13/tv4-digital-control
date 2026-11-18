@@ -3,6 +3,7 @@
 #include <UIManager.h>
 #include "services/DiagnosticsService.h"
 #include "services/ModbusService.h"
+#include "services/NetworkService.h"
 #include "sensors/PulseInput.h"
 #include "storage/SettingsService.h"
 #include "touch/CalibrationScreen.h"
@@ -27,10 +28,12 @@ private:
     StatisticsService liveStats_;
     RPMService rpm_{liveStats_};
     PulseInput input_;
+    NetworkService network_{input_};
+    RpmHistory histories_[2];
     SettingsService storage_;
     DiagnosticsService diagnostics_;
     ModbusService modbus_;
-    uint64_t nextRender_=0, nextCalRead_=0;
+    uint64_t nextRender_=0, nextCalRead_=0, nextNetwork_=0;
     bool displayReady_=false, calibrationStoreOK_=true;
 };
 }
