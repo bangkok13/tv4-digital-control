@@ -3,7 +3,10 @@
 #include <cstdio>
 #include <cstring>
 
-extern "C" { LV_FONT_DECLARE(tv4_text_15); }
+extern "C" {
+LV_FONT_DECLARE(tv4_text_15);
+LV_FONT_DECLARE(tv4_title_23);
+}
 namespace tv4 {
 namespace {
 constexpr uint32_t bg=0x111820, surface=0x23313e, white=0xf1f6fa, muted=0xa9b9c5,
@@ -73,7 +76,7 @@ void UIManager::begin() {
     lv_obj_set_style_bg_color(root,color(bg),0);
     lv_obj_set_style_bg_opa(root,LV_OPA_COVER,0);
     lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
-    title_=label(root,"",12,12,151);
+    title_=label(root,"",12,12,184);
     badge_=label(root,"",200,10,28,amber,LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_bg_color(badge_,color(surface),0);
     lv_obj_set_style_bg_opa(badge_,LV_OPA_COVER,0);
@@ -141,7 +144,8 @@ void UIManager::build() {
     if (screen_!=Screen::Splash) {
         const bool home = screen_==Screen::Home;
         set(title_,home ? "TV-4 Шкильнык" : "TV-4 DIGITAL");
-        lv_obj_set_style_text_font(title_,home ? &tv4_text_15 : &lv_font_montserrat_20,0);
+        lv_obj_set_y(title_,home ? 7 : 12);
+        lv_obj_set_style_text_font(title_,home ? &tv4_title_23 : &lv_font_montserrat_20,0);
     }
     switch(screen_) {
     case Screen::Splash:

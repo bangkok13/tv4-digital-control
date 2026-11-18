@@ -5,9 +5,17 @@ from PIL import Image, ImageDraw, ImageFont
 
 parser = argparse.ArgumentParser()
 parser.add_argument("ttf", type=Path)
+parser.add_argument("--title", action="store_true", help="Generate the larger dashboard title font")
 args = parser.parse_args()
-font = ImageFont.truetype(str(args.ttf), 15)
-ranges = [(32, 126), (0x401, 0x401), (0x410, 0x44F), (0x451, 0x451), (0x2212, 0x2212)]
+if args.title:
+    name, size = "tv4_title_23", 23
+    ranges = [(c, c) for c in sorted(set(map(ord, "TV-4 Шкильнык")))]
+else:
+    name, size = "tv4_text_15", 15
+    ranges = [(32, 126), (0x401, 0x401), (0x410, 0x44F), (0x451, 0x451), (0x2212, 0x2212)]
+font = ImageFont.truetype(str(args.ttf), size)
+ascent, descent = font.getmetrics()
+line_height, base_line = (ascent + descent, descent) if args.title else (21, 5)
 bitmap = []
 descriptors = ["    {0},"]
 cmaps = []
@@ -40,7 +48,7 @@ lines += ["};", "static const lv_font_fmt_txt_glyph_dsc_t glyphs[] = {", *descri
           "static const lv_font_fmt_txt_dsc_t dsc = {",
           "    .glyph_bitmap=bitmap, .glyph_dsc=glyphs, .cmaps=maps,",
           f"    .cmap_num={len(ranges)}, .bpp=4, .cache=&cache", "};",
-          "const lv_font_t tv4_text_15 = {", "    .get_glyph_dsc=lv_font_get_glyph_dsc_fmt_txt,",
-          "    .get_glyph_bitmap=lv_font_get_bitmap_fmt_txt, .line_height=21, .base_line=5, .dsc=&dsc", "};"]
-out = Path(__file__).resolve().parents[1] / "lib/PanelUI/src/tv4_text_15.c"
+          f"const lv_font_t {name} = {{", "    .get_glyph_dsc=lv_font_get_glyph_dsc_fmt_txt,",
+          f"    .get_glyph_bitmap=lv_font_get_bitmap_fmt_txt, .line_height={line_height}, .base_line={base_line}, .dsc=&dsc", "};"]
+out = Path(__file__).resolve().parents[1] / "lib/PanelUI/src" / f"{name}.c"
 out.write_text("\n".join(lines)+"\n", encoding="utf-8")
