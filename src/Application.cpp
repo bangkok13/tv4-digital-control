@@ -11,8 +11,10 @@ void Application::begin() {
     const bool panel=lcd_.begin(state_.settings.get(Field::Brightness));
     if (!touch_.begin()) Serial.println("[error] touch SPI");
     displayReady_=panel && port_.begin(lcd_,touch_);
-    if (displayReady_) ui_.begin();
-    else Serial.println("[error] display initialization; diagnostics continue over USB");
+    if (displayReady_) {
+        ui_.begin();
+        Serial.printf("[UI] 6 VOLT GARAGE at %lu ms\n", millis());
+    } else Serial.println("[error] display initialization; diagnostics continue over USB");
 }
 void Application::configureCapture() {
     input_.setEnabled(state_.settings.mode==Mode::Live);
@@ -81,8 +83,12 @@ void Application::tick() {
         }
         return;
     }
+    const bool showingSplash = ui_.screen() == Screen::Splash;
+    if (showingSplash) port_.ignoreUntilReleased();
     if (now>=nextRender_ || ui_.needsUpdate()) {
         ui_.update(state_);
+        if (showingSplash && ui_.screen() == Screen::Home)
+            Serial.printf("[UI] tachometer at %lu ms\n", static_cast<unsigned long>(ms));
         nextRender_=now+1000ULL*state_.settings.get(Field::Refresh);
     }
     port_.tick(ms);

@@ -8,6 +8,7 @@ namespace tv4 {
 namespace {
 constexpr uint32_t bg=0x111820, surface=0x23313e, white=0xf1f6fa, muted=0xa9b9c5,
                    blue=0x65cff5, green=0x7ad69b, amber=0xf6c662, red=0xff7878;
+constexpr uint32_t splashDurationMs = 2000;
 lv_color_t color(uint32_t c) { return lv_color_hex(c); }
 lv_obj_t* label(lv_obj_t* parent, const char* text, int x, int y, int w,
                 uint32_t ink=white, lv_text_align_t align=LV_TEXT_ALIGN_LEFT,
@@ -47,6 +48,24 @@ const char* signalText(Signal s) {
 void number(char* out,size_t size,uint64_t n) {
     std::snprintf(out,size,"%llu",static_cast<unsigned long long>(n));
 }
+void drawSplash(lv_obj_t* body) {
+    constexpr uint32_t brass = 0xffbf51;
+    label(body, LV_SYMBOL_CHARGE, 0, 7, 240, brass, LV_TEXT_ALIGN_CENTER, &lv_font_montserrat_48);
+    label(body, "6 VOLT", 0, 67, 240, white, LV_TEXT_ALIGN_CENTER, &lv_font_montserrat_48);
+
+    auto* garage = label(body, "GARAGE", 0, 127, 240, brass, LV_TEXT_ALIGN_CENTER, &lv_font_montserrat_20);
+    lv_obj_set_style_text_letter_space(garage, 7, 0);
+
+    auto* greeting = label(body, "С ДР, БРО!", 42, 177, 156, white, LV_TEXT_ALIGN_CENTER);
+    lv_obj_set_style_border_side(greeting, LV_BORDER_SIDE_TOP, 0);
+    lv_obj_set_style_border_color(greeting, color(brass), 0);
+    lv_obj_set_style_border_width(greeting, 1, 0);
+    lv_obj_set_style_pad_top(greeting, 15, 0);
+    lv_obj_set_style_text_letter_space(greeting, 2, 0);
+}
+}
+bool UIManager::splashExpired() const {
+    return screen_ == Screen::Splash && lv_tick_elaps(splashStarted_) >= splashDurationMs;
 }
 void UIManager::begin() {
     auto* root=lv_scr_act();
@@ -54,8 +73,7 @@ void UIManager::begin() {
     lv_obj_set_style_bg_color(root,color(bg),0);
     lv_obj_set_style_bg_opa(root,LV_OPA_COVER,0);
     lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
-    label(root,"TV-4 DIGITAL",12,12,151,white,LV_TEXT_ALIGN_LEFT,&lv_font_montserrat_20);
-    badge_=label(root,"DEMO",166,10,62,amber,LV_TEXT_ALIGN_CENTER);
+    badge_=label(root,"",166,10,62,amber,LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_bg_color(badge_,color(surface),0);
     lv_obj_set_style_bg_opa(badge_,LV_OPA_COVER,0);
     lv_obj_set_style_radius(badge_,5,0);
@@ -65,6 +83,8 @@ void UIManager::begin() {
     lv_obj_set_pos(body_,0,46);
     lv_obj_set_size(body_,240,274);
     lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);
+    build();
+    splashStarted_ = lv_tick_get();
 }
 void UIManager::button(Key key,const char* caption,int x,int y,int w,int h,uint32_t fill) {
     auto* btn=lv_btn_create(body_);
@@ -118,6 +138,9 @@ void UIManager::build() {
     lv_obj_clean(body_);
     rebuild_=false;
     switch(screen_) {
+    case Screen::Splash:
+        drawSplash(body_);
+        break;
     case Screen::Home:
         label(body_,"ОБОРОТЫ ШПИНДЕЛЯ",12,5,216,muted);
         rpm_=label(body_,"",12,32,168,white,LV_TEXT_ALIGN_LEFT,&lv_font_montserrat_48);
@@ -206,12 +229,17 @@ void UIManager::renderRows(const MachineState& s) {
     }
 }
 void UIManager::update(const MachineState& s) {
+    if (splashExpired()) {
+        label(lv_obj_get_parent(body_), "TV-4 DIGITAL", 12, 12, 151, white, LV_TEXT_ALIGN_LEFT, &lv_font_montserrat_20);
+        navigate(Key::Home);
+    }
     if (rebuild_) build();
     fieldChanged_=false;
     const bool demo=s.settings.mode==Mode::Demo;
     set(badge_,demo ? "DEMO" : "LIVE"); ink(badge_,demo ? amber : green);
     char buf[80];
     switch(screen_) {
+    case Screen::Splash: break;
     case Screen::Home: {
         const lv_font_t* font=s.motion.hasRpm ? &lv_font_montserrat_48 : &tv4_text_15;
         if (lv_obj_get_style_text_font(rpm_,LV_PART_MAIN)!=font) lv_obj_set_style_text_font(rpm_,font,0);

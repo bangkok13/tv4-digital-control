@@ -26,7 +26,7 @@ void LvglPort::flush(lv_disp_drv_t* d,const lv_area_t* area,lv_color_t* pixels) 
 void LvglPort::input(lv_indev_drv_t* d,lv_indev_data_t* data) {
     auto& self=*static_cast<LvglPort*>(d->user_data);
     const auto c=self.touch_->read();
-    if (c.down && !self.touch_->calibrated()) {
+    if (c.down && !self.suppress_ && !self.touch_->calibrated()) {
         self.wantCalibration_=true;
         self.suppress_=true;
     }

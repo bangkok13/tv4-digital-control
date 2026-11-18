@@ -58,12 +58,31 @@ int main(int argc,char** argv) {
     require(lv_disp_drv_register(&display)!=nullptr,"display");
     lv_indev_drv_init(&pointer); pointer.type=LV_INDEV_TYPE_POINTER; pointer.read_cb=input;
     require(lv_indev_drv_register(&pointer)!=nullptr,"pointer"); ui.begin();
+    const uint32_t splashStart = lv_tick_get();
     state.motion.hasRpm=true; state.motion.rpm=1250; state.motion.rotating=true;
     state.motion.signal=Signal::Tracking; state.uptimeUs=137000000;
     state.motion.lastEdgeUs=state.uptimeUs-1000; state.motion.pulses=5200;
     advance();
+    require(ui.screen()==Screen::Splash && flushes>0 && has(lv_scr_act(),"6 VOLT") &&
+            has(lv_scr_act(),"GARAGE") && has(lv_scr_act(),"С ДР, БРО!") &&
+            has(lv_scr_act(),"DEMO") && !has(lv_scr_act(),"1250"),"birthday splash at boot");
+    if (argc>=3) capture(argv[2]);
+    state.settings.mode=Mode::Live; advance();
+    require(has(lv_scr_act(),"LIVE") && !has(lv_scr_act(),"DEMO"),"saved mode badge on splash");
+    state.settings.mode=Mode::Demo;
+    require(tap(50,285).action==Action::None && ui.screen()==Screen::Splash,"touch during splash");
+    point={50,285}; down=true; advance();
+    lv_tick_inc(1999-lv_tick_elaps(splashStart));
+    ui.update(state);
+    require(!ui.needsUpdate() && ui.screen()==Screen::Splash,"splash remains through 1999 ms");
+    lv_tick_inc(1);
+    require(ui.needsUpdate(),"transition due at 2000 ms");
+    advance();
+    down=false; advance();
+    require(ui.take().action==Action::None && ui.screen()==Screen::Home &&
+            has(lv_scr_act(),"TV-4 DIGITAL") && !has(lv_scr_act(),"GARAGE"),"home after held boot touch");
     require(flushes>0 && has(lv_scr_act(),"1250") && has(lv_scr_act(),"DEMO"),"demo tachometer");
-    if (argc==2) capture(argv[1]);
+    if (argc>=2) capture(argv[1]);
     tap(170,285); require(ui.screen()==Screen::Stats && has(lv_scr_act(),"Пуски"),"stats");
     tap(170,285); require(ui.screen()==Screen::ConfirmReset,"reset asks first");
     require(tap(50,285).action==Action::None && ui.screen()==Screen::Stats,"cancel reset");
