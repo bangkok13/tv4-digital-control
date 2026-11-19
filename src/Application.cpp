@@ -8,7 +8,7 @@ void startNetworkBench(NetworkService&,bool);
 void Application::begin() {
     Serial.begin(115200);
     diagnostics_.begin(state_.diagnostic);
-    storage_.begin(state_.settings,liveStats_,&state_.workshop);
+    storage_.begin(state_.settings,liveStats_,&state_.workshop,&state_.dial);
     demo_.begin(esp_timer_get_time());
     input_.setEnabled(true);
     configureCapture();
@@ -57,6 +57,19 @@ void Application::apply(Command cmd,uint64_t now) {
     case Action::SetInput:
         if (cmd.value>=0 && state_.workshop.set(cmd.input,unsigned(cmd.value))) storage_.edited(now);
         break;
+    case Action::RecordDial: {
+        const auto rpm=liveSpindleRpm(state_);
+        auto next=state_.dial;
+        if (!rpm) ui_.dialFeedback("");
+        else if (cmd.value<0 || !next.record(cmd.gear,cmd.point,unsigned(cmd.value),*rpm))
+            ui_.dialFeedback("Нужны две разные точки.");
+        else if (state_.dial.gears[cmd.gear].points[cmd.point].rpm==*rpm &&
+                 state_.dial.gears[cmd.gear].points[cmd.point].percent==cmd.value)
+            ui_.dialFeedback("Эта точка уже сохранена.");
+        else if (!storage_.saveDial(next)) ui_.dialFeedback("Ошибка сохранения в NVS.");
+        else { state_.dial=next; ui_.dialFeedback("Точка сохранена."); }
+        break;
+    }
     case Action::DemoSpeed:
         if(settings.mode==Mode::Demo) {state_.demoTarget=cmd.value;demo_.manual(cmd.value);}break;
     case Action::Portal: network_.openPortal();break;

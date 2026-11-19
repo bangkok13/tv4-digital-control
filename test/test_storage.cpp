@@ -51,5 +51,13 @@ int main() {
     machine.interval(100000,600);upgrade.tick(300000000,cfg,machine);
     Workshop restored;SettingsService again;again.begin(cfg,machine,&restored);
     check(restored.get(Input::Pitch)==125&&machine.recent()[0].us==100000&&again.powered(2000000)==302000000,"v2 state on restart");
+    DialBook dial;
+    SettingsService on21;on21.begin(cfg,machine,&restored,&dial);
+    check(dial.valid()&&!dial.gears[0].percentFor(120)&&restored.get(Input::Pitch)==125,"v2.0.x upgrade");
+    check(dial.record(2,0,25,110)&&dial.record(2,1,75,210)&&on21.saveDial(dial),"store measured dial");
+    Preferences::fail=true;DialBook changed=dial;changed.record(2,1,80,230);
+    check(!on21.saveDial(changed),"failed dial write");Preferences::fail=false;
+    SettingsService dialBoot;DialBook recovered;dialBoot.begin(cfg,machine,&restored,&recovered);
+    check(recovered.gears[2].percentFor(160)==50 && !recovered.gears[1].percentFor(160),"per-gear dial survives reboot");
     std::puts("OK: production NVS scheduler, write bounds, retry, reset and recovery on simulated reboot");
 }

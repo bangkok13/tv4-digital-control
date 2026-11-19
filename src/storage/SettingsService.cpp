@@ -1,12 +1,13 @@
 #include "SettingsService.h"
 
 namespace tv4 {
-void SettingsService::begin(Settings& s,StatisticsService& stats,Workshop* work) {
+void SettingsService::begin(Settings& s,StatisticsService& stats,Workshop* work,DialBook* dial) {
     work_=work;
     open_=store_.open();
     if (!open_) { Serial.println("[NVS] open failed; RAM only"); return; }
     Config config; RunLog log;
     auto cfg=config2_.load(config), hist=log2_.load(log);
+    if (dial) dialOK_=dial_.load(*dial)!=Load::Damaged;
     if (cfg==Load::Empty) cfg=settings_.load(s);
     else if (cfg!=Load::Damaged) { s=config.panel; if (work_) *work_=config.work; }
     if (hist==Load::Empty) hist=totals_.load(log.totals);

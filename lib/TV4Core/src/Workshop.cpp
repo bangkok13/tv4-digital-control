@@ -118,6 +118,74 @@ std::optional<Thread> threadGeometry(double d, double p) {
         return {};
     return Thread{0.8660254 * p, d - 0.649519 * p, d - 1.226869 * p, d - 1.082532 * p, d - p};
 }
+const char* positionName(LeverPos p) {
+    switch (p) {
+    case LeverPos::DownRight: return "вниз-вправо";
+    case LeverPos::Down: return "вниз";
+    case LeverPos::DownLeft: return "вниз-влево";
+    case LeverPos::Up: return "вверх";
+    case LeverPos::UpRight: return "вверх-вправо";
+    case LeverPos::UpLeft: return "вверх-влево";
+    }
+    return "";
+}
+std::optional<LeverPos> pitchPosition(unsigned pitch) {
+    switch (pitch) {
+    case 80: return LeverPos::Up;
+    case 100: return LeverPos::UpRight;
+    case 125: return LeverPos::UpLeft;
+    default: return {};
+    }
+}
+// Rostov plate with the 120 / 180 / 250 and 390 / 500 / 710 rows.
+const SpindleGear spindleGears[6] = {
+    {120,LeverPos::DownRight,LeverPos::Down}, {180,LeverPos::DownRight,LeverPos::DownRight},
+    {250,LeverPos::DownRight,LeverPos::DownLeft}, {390,LeverPos::DownLeft,LeverPos::Down},
+    {500,LeverPos::DownLeft,LeverPos::DownRight}, {710,LeverPos::DownLeft,LeverPos::DownLeft}
+};
+std::optional<ThreadSpeed> threadSpeed(const Workshop& w) {
+    if (!w.valid() || !supportedPitch(w.get(Input::Pitch)) || w.mm(Input::ThreadDiameter)>200 ||
+        !threadGeometry(w.mm(Input::ThreadDiameter),w.mm(Input::Pitch))) return {};
+    // TO 34-1-10, table 4-2: lower threading speed in feet/min for carbide.
+    // Steel is medium carbon. For HSS use the stated 50% reduction.
+    constexpr double fpm[] = {30,25,100,75,40};
+    const double speed = fpm[w.get(Input::Material)] * 0.3048 * (w.get(Input::Tool) ? 1.0 : 0.5);
+    const unsigned calculated = unsigned(std::floor(*turningRpm(w.mm(Input::ThreadDiameter),speed)));
+    unsigned gear = 0;
+    while (gear+1<std::size(spindleGears) && spindleGears[gear+1].rpm<=calculated) ++gear;
+    const bool below = calculated<spindleGears[0].rpm;
+    return ThreadSpeed{speed,calculated,below ? calculated : spindleGears[gear].rpm,gear,below};
+}
+void formatMillimetres(unsigned v,char* text,unsigned size) {
+    if (v%100==0) std::snprintf(text,size,"%u",v/100);
+    else if (v%10==0) std::snprintf(text,size,"%u,%u",v/100,v%100/10);
+    else std::snprintf(text,size,"%u,%02u",v/100,v%100);
+}
+bool DialPair::valid() const {
+    for (const auto& p:points)
+        if (p.percent>100 || p.rpm>6000 || p.reserved || (!p.rpm && p.percent)) return false;
+    return !points[0].rpm || !points[1].rpm ||
+        (points[0].percent!=points[1].percent && points[0].rpm!=points[1].rpm);
+}
+std::optional<unsigned> DialPair::percentFor(unsigned rpm) const {
+    const auto a=points[0], b=points[1];
+    if (!valid() || !a.rpm || !b.rpm || rpm<std::min(a.rpm,b.rpm) || rpm>std::max(a.rpm,b.rpm))
+        return {};
+    const double fraction=(double(rpm)-a.rpm)/(int(b.rpm)-int(a.rpm));
+    return unsigned(std::lround(a.percent+fraction*(int(b.percent)-int(a.percent))));
+}
+bool DialBook::valid() const {
+    for (const auto& pair:gears) if (!pair.valid()) return false;
+    return true;
+}
+bool DialBook::record(unsigned gear,unsigned point,unsigned percent,unsigned rpm) {
+    if (gear>=std::size(gears) || point>=2 || percent>100 || !rpm || rpm>6000) return false;
+    auto pair=gears[gear];
+    pair.points[point]={uint16_t(rpm),uint8_t(percent),0};
+    if (!pair.valid()) return false;
+    gears[gear]=pair;
+    return true;
+}
 std::optional<Passes> roughing(double start, double finish, double depth, double allowance) {
     if (!positive(start) || !positive(finish) || !positive(depth) || !nonnegative(allowance) ||
         start < finish)
@@ -131,22 +199,18 @@ std::optional<Passes> roughing(double start, double finish, double depth, double
     return Passes{start - finish, radial, allowance, unsigned(count)};
 }
 const Control controls[9] = {
-    {1, "Ступень шпинделя", "Вместе с N2 выбирает одну из шести механических скоростей.",
-     "По табличке скоростей.", "По табличке скоростей."},
-    {2, "Ступень шпинделя", "Второй рычаг коробки скоростей. Паспортный диапазон 120-710 об/мин.",
-     "По табличке скоростей.", "По табличке скоростей."},
-    {3, "Трензель", "Направление движения подачи. Положения Л, Н, П. В нейтрали привод подач разомкнут.",
-     "Проверить ход суппорта для выбранной руки резьбы.", "По направлению требуемой подачи."},
-    {4, "Шаг и подача", "Три положения на коробке подач. Значение читать по табличке станка.",
-     "По строке выбранного шага.", "По строке выбранной подачи."},
-    {5, "Винт / вал", "Выбирает ходовой винт для резьбы или ходовой вал для подачи.",
-     "Винт, крайнее правое.", "Вал, крайнее левое."},
-    {6, "Маховик каретки", "Ручное продольное перемещение каретки. Фиксированных положений нет.",
-     "См. состояние реечной шестерни N7.", "См. состояние реечной шестерни N7."},
-    {7, "Реечная шестерня", "Кнопка связи маховика с рейкой. Имеет два положения.", "Кнопка на себя.",
-     "Кнопка на себя."},
-    {8, "Самоход", "Включает продольную подачу от ходового вала.", "Выключен, вниз от себя.",
-     "Включён, на себя."},
-    {9, "Маточная гайка", "Соединяет каретку с ходовым винтом для резьбы.", "Замкнута, крайнее нижнее.",
-     "Разомкнута, верхнее."}};
+    {1,"А","Скорость I","Средняя ручка передней бабки. Вместе с Б задаёт ступень шпинделя.",
+     "Положение I в таблице скоростей.","Положение I в таблице скоростей."},
+    {2,"Б","Скорость II","Правая ручка передней бабки. Выбирает скорость вместе с А.",
+     "Положение II в таблице скоростей.","Положение II в таблице скоростей."},
+    {3,"В","Направление","Л и П задают ход каретки, Н отключает подачу.",
+     "Сверьте ход при отведённом резце.","Л для хода влево, П для хода вправо."},
+    {4,"Г","Шаг и подача III","Правая ручка коробки подач. Верхние положения выбирают три шага или подачи.",
+     "См. колонку шага на шильдике.","См. колонку подачи на шильдике."},
+    {5,"Д","Винт или вал","Левая ручка коробки подач. Выбирает, чем приводить каретку.",
+     "К надписи ВИНТ.","К надписи ВАЛ."},
+    {6,"Е","Маховик каретки","Перемещает каретку вручную.","Фиксированного положения нет.","Фиксированного положения нет."},
+    {7,"Ж","Реечная шестерня","Кнопка связи маховика с рейкой.","Вытянуть на себя.","Вытянуть на себя."},
+    {8,"З","Самоход","Включает продольную подачу от ходового вала.","Выключить, вниз от себя.","Включить, на себя."},
+    {9,"И","Маточная гайка","Соединяет каретку с ходовым винтом.","При настройке вверх. Для рабочего прохода вниз.","Вверх, разомкнута."}};
 } // namespace tv4

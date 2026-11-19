@@ -87,12 +87,18 @@ struct MachineState {
     Diagnostics diagnostic{};
     DriveTelemetry drive{};
     Workshop workshop{};
+    DialBook dial{};
     const RpmHistory* history=nullptr;
     Operation recent[4]{};
     uint64_t poweredUs=0;
     int demoTarget=-1;
     NetworkInfo network{};
 };
+inline std::optional<unsigned> liveSpindleRpm(const MachineState& s) {
+    if (s.settings.mode!=Mode::Live || s.motion.signal!=Signal::Tracking || !s.motion.hasRpm ||
+        !std::isfinite(s.motion.rpm) || s.motion.rpm<1 || s.motion.rpm>6000) return {};
+    return unsigned(std::lround(s.motion.rpm));
+}
 inline uint64_t saturatedSum(uint64_t a, uint64_t b) {
     return UINT64_MAX-a < b ? UINT64_MAX : a+b;
 }

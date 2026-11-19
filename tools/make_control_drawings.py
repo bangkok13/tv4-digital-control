@@ -1,4 +1,4 @@
-"""Convert four indexed crops of the TV-4 factory figure 1 into LVGL assets."""
+"""Convert the three control assemblies from TV-4 factory figure 1 to LVGL."""
 import argparse
 from pathlib import Path
 from PIL import Image
@@ -9,8 +9,8 @@ args = parser.parse_args()
 source = Image.open(args.figure).convert("L")
 if source.size != (1200, 966):
     raise SystemExit("Use the documented 1200 x 966 edition of figure 1")
-crops = {"head": (50, 70, 562, 326), "gears": (177, 134, 485, 288),
-         "feedbox": (150, 280, 510, 460), "apron": (538, 272, 838, 422)}
+crops = {"head": (156, 130, 476, 290), "feedbox": (150, 280, 510, 460),
+         "apron": (538, 272, 838, 422)}
 lines = ["/* Factory figure 1. Source and figure numbering in docs/tv4-controls.md. */", "#include <lvgl.h>"]
 for name, bounds in crops.items():
     grid = source.crop(bounds).resize((224, 112), Image.Resampling.LANCZOS)

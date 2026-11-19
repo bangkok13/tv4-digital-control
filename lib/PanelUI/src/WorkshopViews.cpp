@@ -5,7 +5,6 @@
 
 extern "C" {
 LV_IMG_DECLARE(tv4_head);
-LV_IMG_DECLARE(tv4_gears);
 LV_IMG_DECLARE(tv4_feedbox);
 LV_IMG_DECLARE(tv4_apron);
 }
@@ -13,9 +12,14 @@ namespace tv4 {
 namespace {
 constexpr uint32_t surface = 0x23313e, accent = 0x235268, blue = 0x65cff5, amber = 0xf6c662;
 constexpr unsigned windows[]{30, 120, 600};
-constexpr const char *groupNames[]{"Передняя бабка", "Коробка скоростей", "Коробка подач", "Фартук"};
-const lv_img_dsc_t *drawings[]{&tv4_head, &tv4_gears, &tv4_feedbox, &tv4_apron};
-constexpr unsigned firstControl[]{0, 0, 3, 5}, groupCount[]{3, 2, 2, 4};
+constexpr const char *groupNames[]{"Передняя бабка", "Коробка подач", "Фартук"};
+const lv_img_dsc_t *drawings[]{&tv4_head, &tv4_feedbox, &tv4_apron};
+constexpr unsigned firstControl[]{0,3,5}, groupCount[]{3,2,4};
+// Centres on the handles inside the 224 x 112 crops of factory figure 1.
+constexpr lv_point_t handleCentres[][4]={
+    {{118,80},{178,80},{78,80},{}}, {{123,22},{68,22},{},{}},
+    {{41,73},{84,32},{123,91},{177,53}}
+};
 constexpr Input turning[]{Input::Diameter, Input::Material, Input::Tool, Input::Speed};
 constexpr Input threading[]{Input::ThreadDiameter, Input::Pitch,    Input::Internal,
                             Input::Left,           Input::Material, Input::Tool};
@@ -116,15 +120,43 @@ void UIManager::workshopKey(Key key) {
             calc_ = screen_ = Screen::Feed;
             break;
         case Key::Controls:
-            if (screen_ == Screen::Thread &&
-                (!supportedPitch(w.get(Input::Pitch)) ||
-                 !threadGeometry(w.mm(Input::ThreadDiameter), w.mm(Input::Pitch))))
-                return;
             controlOrigin_ = screen_;
             threadGuide_ = screen_ != Screen::Feed;
-            controlGroup_ = 0;
+            controlGroup_ = screen_==Screen::Feed ? 1 : 0;
             screen_ = Screen::Controls;
             break;
+        case Key::ThreadSetup:
+        case Key::ThreadRpm:
+            if (!threadSpeed(w)) return;
+            screen_=key==Key::ThreadSetup ? Screen::ThreadSetup : Screen::ThreadRpm;
+            break;
+        case Key::Plate:
+            plateOrigin_=screen_;
+            platePage_=(screen_==Screen::Thread || (screen_==Screen::Controls && controlGroup_==1)) ? 1 : 0;
+            screen_=Screen::Plate;
+            break;
+        case Key::Dial:
+            dialMessage_="";
+            dialPercent_=50;
+            screen_=Screen::Dial;
+            break;
+        case Key::DialMinus:
+        case Key::DialPlus:
+            dialPercent_=unsigned(std::clamp(int(dialPercent_)+(key==Key::DialPlus ? 5 : -5),0,100));
+            dialMessage_="";
+            fieldChanged_=true;
+            return;
+        case Key::PointA:
+        case Key::PointB: {
+            const auto setup=threadSpeed(w);
+            if (!setup) return;
+            if (!liveSpindleRpm(*state_)) return;
+            pending_.action=Action::RecordDial;
+            pending_.gear=setup->gear;
+            pending_.point=key==Key::PointB ? 1 : 0;
+            pending_.value=int(dialPercent_);
+            return;
+        }
         case Key::Graphs:
             screen_ = Screen::Graphs;
             break;
@@ -163,7 +195,8 @@ void UIManager::workshopKey(Key key) {
         case Key::Prev:
         case Key::Next:
             if (screen_ == Screen::Controls)
-                controlGroup_ = (controlGroup_ + (key == Key::Next ? 1 : 3)) % 4;
+                controlGroup_ = (controlGroup_ + (key == Key::Next ? 1 : 2)) % 3;
+            if (screen_ == Screen::Plate) platePage_=1-platePage_;
             if (screen_ == Screen::Graphs)
                 graphWindow_ = (graphWindow_ + 1) % 3;
             break;
@@ -210,8 +243,14 @@ void UIManager::workshopKey(Key key) {
                 screen_ = Screen::Network;
                 break;
             case Screen::ThreadInfo:
+                screen_=Screen::Inputs;
+                break;
+            case Screen::ThreadSetup:
+            case Screen::ThreadRpm:
                 screen_ = Screen::Thread;
                 break;
+            case Screen::Dial: screen_=Screen::ThreadRpm; break;
+            case Screen::Plate: screen_=plateOrigin_; break;
             default:
                 screen_ = Screen::Menu;
                 break;
@@ -273,22 +312,12 @@ void UIManager::buildWorkshop() {
                120, 220, 110, 44, accent);
         break;
     case Screen::Turning:
-    case Screen::Thread:
     case Screen::Rough:
     case Screen::Feed:
         heading(name(screen_));
         dataRows(4, 25, 28);
         note_ = caption("", 10, 139, 220, amber, true);
-        if (screen_ == Screen::Thread || screen_ == Screen::Feed) {
-            if (screen_ == Screen::Thread)
-                button(Key::ThreadInfo, "Геометрия", 10, 176, 104, 38, surface);
-            button(Key::Controls, "Рычаги ТВ-4", screen_ == Screen::Thread ? 120 : 10, 176,
-                   screen_ == Screen::Thread ? 110 : 220, 38, surface);
-            if (screen_ == Screen::Thread && (!supportedPitch(state_->workshop.get(Input::Pitch)) ||
-                                              !threadGeometry(state_->workshop.mm(Input::ThreadDiameter),
-                                                              state_->workshop.mm(Input::Pitch))))
-                lv_obj_add_state(lv_obj_get_child(body_, -1), LV_STATE_DISABLED);
-        }
+        if (screen_ == Screen::Feed) button(Key::Controls,"Рычаги ТВ-4",10,176,220,38,surface);
         back();
         button(Key::Inputs, "Параметры", 120, 220, 110, 44, accent);
         break;
@@ -299,7 +328,10 @@ void UIManager::buildWorkshop() {
             button(static_cast<Key>(unsigned(Key::Slot0) + i), "", 10, 24 + 32 * i, 220, 30, surface);
             rowValues_[i] = lv_obj_get_child(lv_obj_get_child(body_, -1), 0);
         }
-        back();
+        if (calc_==Screen::Thread) {
+            button(Key::Back,"Результат",10,220,104,44,accent);
+            button(Key::ThreadInfo,"Размеры",120,220,110,44,surface);
+        } else back();
         break;
     }
     case Screen::Number: {
@@ -323,49 +355,54 @@ void UIManager::buildWorkshop() {
         lv_img_set_src(img, drawings[controlGroup_]);
         lv_obj_set_pos(img, 8, 23);
         const unsigned count = groupCount[controlGroup_];
-        // Centres of the numbered leaders in the enlarged crops of figure 1.
-        static const lv_point_t hits[4][4] = {{{119, 82}, {159, 82}, {96, 82}, {}},
-                                              {{106, 90}, {171, 90}, {}, {}},
-                                              {{123, 36}, {67, 36}, {}, {}},
-                                              {{60, 69}, {82, 32}, {123, 94}, {161, 58}}};
         for (unsigned i = 0; i < count; ++i) {
-            const auto n = firstControl[controlGroup_] + i + 1;
-            char mark[12];
-            std::snprintf(mark, sizeof(mark), "N%u", n);
-            const bool used = controlOrigin_ != Screen::Menu &&
-                              (n == 3 || n == 4 || n == 5 || n == 7 || n == 8 || n == 9);
-            button(static_cast<Key>(unsigned(Key::Slot0) + i), mark, 10 + i * (220 / count), 143,
-                   216 / count, 36, used ? accent : surface);
-            auto *spot = lv_btn_create(img);
-            lv_obj_remove_style_all(spot);
-            lv_obj_set_pos(spot, hits[controlGroup_][i].x - 12, hits[controlGroup_][i].y - 12);
-            lv_obj_set_size(spot, 24, 24);
-            lv_obj_set_style_border_color(spot, lv_color_hex(used ? 0x167499 : 0x506c78), 0);
-            lv_obj_set_style_border_width(spot, 2, 0);
-            lv_obj_set_style_radius(spot, LV_RADIUS_CIRCLE, 0);
-            lv_obj_set_user_data(spot, reinterpret_cast<void *>(uintptr_t(unsigned(Key::Slot0) + i)));
-            lv_obj_add_event_cb(spot, clicked, LV_EVENT_CLICKED, this);
+            const auto &c=controls[firstControl[controlGroup_]+i];
+            const auto at=handleCentres[controlGroup_][i];
+            button(static_cast<Key>(unsigned(Key::Slot0)+i),c.letter,8+at.x-14,23+at.y-14,
+                   28,28,0x12465e);
+            auto *spot=lv_obj_get_child(body_,-1);
+            lv_obj_set_style_border_width(spot,2,0);
+            lv_obj_set_style_border_color(spot,lv_color_hex(0xf9e6a7),0);
+            lv_obj_set_ext_click_area(spot,3);
         }
-        button(Key::Prev, "<", 10, 183, 48, 32, surface);
-        button(Key::Next, "Другой узел", 62, 183, 168, 32, surface);
+        const char* legends[]={"Коробка скоростей: А и Б","Г: шаг    Д: винт или вал","Е: маховик    Ж: рейка"};
+        caption(legends[controlGroup_],10,136,220);
+        if (controlGroup_==0) caption("В: направление подачи",10,155,220);
+        if (controlGroup_==2) caption("З: самоход    И: гайка",10,155,220);
+        button(Key::Prev,"<",10,176,48,38,surface);
+        button(Key::Next,"Другой узел",62,176,168,38,surface);
         back();
+        button(Key::Plate,"Шильдик",120,220,110,44,accent);
         break;
     }
     case Screen::ControlCard: {
         const auto &c = controls[controlIndex_];
         char title[55];
-        std::snprintf(title, sizeof(title), "N%u  %s", c.number, c.name);
+        std::snprintf(title, sizeof(title), "%s   %s", c.letter, c.name);
         heading(title);
         caption(c.purpose, 10, 32, 220, 0xf1f6fa, true);
-        caption(threadGuide_ ? "Для резьбы" : "Для подачи", 10, 108, 220, blue);
-        caption(threadGuide_ ? c.threading : c.feeding, 10, 134, 220, 0xf1f6fa, true);
-        if (c.number == 4 && controlOrigin_ != Screen::Menu) {
+        const char* instruction=threadGuide_ ? c.threading : c.feeding;
+        char selected[140]{};
+        if (controlOrigin_!=Screen::Menu) {
             const auto &w = state_->workshop;
-            char selected[56];
-            std::snprintf(selected, sizeof(selected), threadGuide_ ? "Шаг %.2f мм" : "Подача %.2f мм/об",
-                          threadGuide_ ? w.mm(Input::Pitch) : feeds[w.get(Input::Feed)] / 100.);
-            caption(selected, 10, 178, 220, blue);
+            const auto speed=threadSpeed(w);
+            if (threadGuide_ && speed && (c.number==1 || c.number==2)) {
+                const auto& g=spindleGears[speed->gear];
+                std::snprintf(selected,sizeof(selected),"%s, ступень %u об/мин.",
+                              positionName(c.number==1 ? g.first : g.second),g.rpm);
+            } else if (threadGuide_ && c.number==3) {
+                instruction=w.get(Input::Left) ? "П, ход вправо. Сверьте с отведённым резцом." :
+                                                "Л, ход к патрону. Сверьте с отведённым резцом.";
+            } else if (c.number==4) {
+                const unsigned index=w.get(Input::Feed);
+                const auto pos=pitchPosition(threadGuide_ ? w.get(Input::Pitch) : pitches[index]);
+                char size[16]; formatMillimetres(threadGuide_ ? w.get(Input::Pitch) : feeds[index],size,sizeof(size));
+                if (pos) std::snprintf(selected,sizeof(selected),"%s %s %s. Ручка III %s.",
+                         threadGuide_ ? "Шаг" : "Подача",size,threadGuide_ ? "мм" : "мм/об",positionName(*pos));
+            }
         }
+        caption(threadGuide_ ? "Для резьбы" : "Для подачи",10,103,220,blue);
+        caption(selected[0] ? selected : instruction,10,130,220,0xf1f6fa,true);
         back();
         break;
     }
@@ -392,15 +429,9 @@ void UIManager::buildWorkshop() {
         dataRows(5, 33, 32);
         back();
         break;
-    case Screen::ThreadInfo:
-        heading("Профиль ISO 60 градусов");
-        caption("H, d2, d3 и D1 теоретические. Допуски берите из чертежа детали. Сверло D-P дано "
-                "примерно под режущий метчик.",
-                10, 28, 220, 0xf1f6fa, true);
-        caption(
-            "Рекоменд. RPM: Н/Д без данных изготовителя резца. Для левой резьбы проверьте ход суппорта.",
-            10, 136, 220, amber, true);
-        back();
+    case Screen::Thread: case Screen::ThreadInfo: case Screen::ThreadSetup:
+    case Screen::ThreadRpm: case Screen::Dial: case Screen::Plate:
+        buildThreadView();
         break;
     case Screen::Network:
         heading("Wi-Fi / OTA");
@@ -466,25 +497,8 @@ void UIManager::renderWorkshop(const MachineState &s) {
         updateText(note_, buf);
         break;
     }
-    case Screen::Thread: {
-        const auto t = threadGeometry(w.mm(Input::ThreadDiameter), w.mm(Input::Pitch));
-        std::snprintf(buf, sizeof(buf), "M%.2f x %.2f %s", w.mm(Input::ThreadDiameter),
-                      w.mm(Input::Pitch), w.get(Input::Left) ? "LH" : "RH");
-        const bool internal = w.get(Input::Internal);
-        put(0, buf, internal ? "Внутр." : "Наруж.");
-        if (t)
-            std::snprintf(buf, sizeof(buf), "%.3f / %.3f", t->height, t->pitchDiameter);
-        put(1, "H / d2, мм", t ? buf : "Н/Д");
-        if (t)
-            std::snprintf(buf, sizeof(buf), "%.3f / %.2f", internal ? t->internalMinor : t->externalRoot,
-                          t->drill);
-        if (t && !internal)
-            std::snprintf(buf, sizeof(buf), "%.3f", t->externalRoot);
-        put(2, internal ? "D1 / сверло*" : "d3, мм", t ? buf : "Н/Д");
-        numeric(3, "Факт. RPM", rpm, "%.0f");
-        updateText(note_, !t                                    ? "Ошибка размеров"
-                          : supportedPitch(w.get(Input::Pitch)) ? "Штатно. Проверьте ход суппорта."
-                                                                : "Штатно недоступно");
+    case Screen::ThreadRpm: case Screen::Dial: {
+        renderThreadView(s);
         break;
     }
     case Screen::Rough: {
@@ -507,7 +521,11 @@ void UIManager::renderWorkshop(const MachineState &s) {
         numeric(1, "Факт. RPM", rpm, "%.0f");
         numeric(2, "Ход в минуту", rpm ? feedTravel(f, *rpm) : std::nullopt, "%.1f мм/мин");
         put(3, "Механизм", "Ходовой вал");
-        updateText(note_, "Шаг резьбы задаёт ход винтом.");
+        const auto pos=pitchPosition(pitches[w.get(Input::Feed)]);
+        if (pos) {
+            std::snprintf(buf,sizeof(buf),"Г (III): %s   Д: ВАЛ",positionName(*pos));
+            updateText(note_,buf);
+        }
         break;
     }
     case Screen::Inputs: {

@@ -138,6 +138,33 @@ void workshopAndGraphs() {
     CHECK(near(*turningRpm(20,100),1591.54943));CHECK(near(*cuttingSpeed(20,1000),62.83185));
     CHECK(near(*feedTravel(.12,710),85.2));CHECK(!turningRpm(0,5));CHECK(!cuttingSpeed(10,NAN));CHECK(!feedTravel(-.1,50));
     CHECK(supportedPitch(80)&&supportedPitch(100)&&supportedPitch(125)&&!supportedPitch(150));
+    CHECK(pitchPosition(80)==LeverPos::Up && pitchPosition(100)==LeverPos::UpRight &&
+          pitchPosition(125)==LeverPos::UpLeft && !pitchPosition(150));
+    const unsigned plateSpeeds[]{120,180,250,390,500,710};
+    const LeverPos colII[]{LeverPos::Down,LeverPos::DownRight,LeverPos::DownLeft};
+    for (unsigned i=0;i<6;++i) {
+        CHECK(spindleGears[i].rpm==plateSpeeds[i] && spindleGears[i].second==colII[i%3]);
+        CHECK(spindleGears[i].first==(i<3 ? LeverPos::DownRight : LeverPos::DownLeft));
+    }
+    Workshop work;
+    auto rec=threadSpeed(work);
+    CHECK(rec && near(rec->metresPerMinute,4.572) && rec->calculated==145 && rec->target==120 && rec->gear==0);
+    work.set(Input::Tool,1); rec=threadSpeed(work); CHECK(rec && rec->target==250 && rec->gear==2);
+    work.set(Input::Material,2); rec=threadSpeed(work); CHECK(rec && rec->target==710 && rec->gear==5);
+    work.set(Input::ThreadDiameter,20000); rec=threadSpeed(work); CHECK(rec && rec->belowPlate && rec->target==48);
+    work.set(Input::ThreadDiameter,20100); CHECK(!threadSpeed(work));
+    work.set(Input::ThreadDiameter,1000); work.set(Input::Pitch,150); CHECK(!threadSpeed(work));
+    work.set(Input::ThreadDiameter,100); work.set(Input::Pitch,100); CHECK(!threadSpeed(work));
+    DialBook dial; CHECK(dial.valid() && !dial.gears[0].percentFor(120));
+    CHECK(dial.record(0,0,25,80) && !dial.gears[0].percentFor(80));
+    CHECK(!dial.record(0,1,25,160) && !dial.record(0,1,75,80) && !dial.record(6,0,20,120));
+    CHECK(dial.record(0,1,75,160) && dial.gears[0].percentFor(120)==50);
+    CHECK(dial.gears[0].percentFor(80)==25 && dial.gears[0].percentFor(160)==75);
+    CHECK(!dial.gears[0].percentFor(79) && !dial.gears[0].percentFor(161) && !dial.gears[1].percentFor(120));
+    CHECK(dial.record(1,0,20,200) && dial.record(1,1,80,100) && dial.gears[1].percentFor(150)==50);
+    MachineState panel; panel.motion={Signal::Tracking,120,true,true};
+    CHECK(!liveSpindleRpm(panel)); panel.settings.mode=Mode::Live; CHECK(liveSpindleRpm(panel)==120);
+    panel.motion.signal=Signal::Silent;CHECK(!liveSpindleRpm(panel));
     const auto g=threadGeometry(10,1.25);CHECK(g && near(g->height,1.08253)&&near(g->pitchDiameter,9.1881));
     CHECK(near(g->externalRoot,8.4664)&&near(g->internalMinor,8.6468)&&near(g->drill,8.75));CHECK(!threadGeometry(1,2));
     auto p=roughing(30,20,1,.2);CHECK(p && p->rough==5 && near(p->radialRemoval,5)&&near(p->finishing,.2));

@@ -41,6 +41,18 @@ bool has(lv_obj_t* root,const char* text) {
         if (has(lv_obj_get_child(root,i),text)) return true;
     return false;
 }
+void labelsFit(lv_obj_t* obj) {
+    if (lv_obj_check_type(obj,&lv_label_class) && lv_label_get_long_mode(obj)==LV_LABEL_LONG_CLIP) {
+        const auto* text=lv_label_get_text(obj);
+        auto width=lv_txt_get_width(text,std::strlen(text),lv_obj_get_style_text_font(obj,0),
+                                    lv_obj_get_style_text_letter_space(obj,0),LV_TEXT_FLAG_NONE);
+        if (width>lv_obj_get_content_width(obj)) {
+            std::fprintf(stderr,"Clipped label (%d > %d): %s\n",width,lv_obj_get_content_width(obj),text);
+            require(false,"visible workshop labels");
+        }
+    }
+    for (unsigned i=0;i<lv_obj_get_child_cnt(obj);++i) labelsFit(lv_obj_get_child(obj,i));
+}
 void capture(const char* path) {
     auto* f=std::fopen(path,"wb"); require(f!=nullptr,"open framebuffer file");
     std::fprintf(f,"P6\n240 320\n255\n");
@@ -111,19 +123,65 @@ int main(int argc,char** argv) {
     tap(170,285);tap(100,111);require(ui.screen()==Screen::Number,"pitch keyboard");
     tap(40,113);tap(40,234);tap(120,113);tap(120,153);const auto edit=tap(170,285);
     require(edit.action==Action::SetInput&&edit.input==Input::Pitch&&edit.value==125,"enter 1.25");
-    state.workshop.set(edit.input,edit.value);tap(50,285);tap(55,240);require(ui.screen()==Screen::ThreadInfo,"geometry notes");
-    tap(50,285);tap(175,240);require(ui.screen()==Screen::Controls,"thread controls");
+    auto picture=[&](const char* name) {
+        labelsFit(lv_scr_act());
+        if (argc<5) return;
+        char filename[512];std::snprintf(filename,sizeof(filename),"%s-%s.ppm",argv[4],name);
+        capture(filename);
+    };
+    state.workshop.set(edit.input,edit.value);tap(170,285);require(ui.screen()==Screen::ThreadInfo,"plain sizes");
+    picture("sizes");
+    tap(50,285);tap(50,285);
+    require(has(lv_scr_act(),"Г   Шаг (III): вверх-влево") && has(lv_scr_act(),"Цель   120 об/мин"),"practical M10 thread");
+    picture("thread");
+    tap(50,240);require(ui.screen()==Screen::ThreadSetup,"all handles");picture("setup");
+    tap(50,240);require(ui.screen()==Screen::Controls,"thread controls");
     if (argc>=4) capture(argv[3]);
-    tap(127,151);require(ui.screen()==Screen::ControlCard,"tap numbered lever on the actual drawing");
-    tap(50,285);tap(170,240);tap(170,240);require(has(lv_scr_act(),"Коробка подач"),"enlarged gearbox");
-    tap(42,206);require(ui.screen()==Screen::ControlCard&&has(lv_scr_act(),"Шаг 1.25 мм"),"selected pitch shown on lever card");
+    labelsFit(lv_scr_act());
+    auto hit=[&](int x,int y,const char* card) {
+        tap(x,y);require(ui.screen()==Screen::ControlCard&&has(lv_scr_act(),card),"tap physical handle");
+        labelsFit(lv_scr_act());tap(50,285);
+    };
+    hit(126,149,"А   Скорость I");hit(186,149,"Б   Скорость II");hit(86,149,"В   Направление");
+    tap(170,240);require(has(lv_scr_act(),"Коробка подач"),"next group is feedbox");picture("feedbox");
+    tap(131,91);require(ui.screen()==Screen::ControlCard && has(lv_scr_act(),"Шаг 1,25 мм. Ручка III вверх-влево."),"pitch on marked handle");
+    tap(50,285);hit(76,91,"Д   Винт или вал");
+    tap(170,240);picture("apron");hit(49,142,"Е   Маховик каретки");hit(92,101,"Ж   Реечная шестерня");
+    hit(131,160,"З   Самоход");hit(185,122,"И   Маточная гайка");
+    tap(170,285);require(ui.screen()==Screen::Plate,"plate link");picture("speed-plate");
+    tap(170,285);picture("feed-plate");
     tap(50,285);tap(50,285);tap(50,285);
+    tap(170,240);require(ui.screen()==Screen::ThreadRpm&&has(lv_scr_act(),"LIVE: нет импульсов"),"pot without tach");
+    picture("rpm");tap(170,244);require(ui.screen()==Screen::Dial,"dial calibration");
+    labelsFit(lv_scr_act());
+    require(tap(125,151).action==Action::None,"no sampling a missing signal");
+    state.settings.mode=Mode::Demo;state.motion={Signal::Tracking,120,true,true};advance();
+    require(tap(125,151).action==Action::None,"no sampling demo");
+    state.settings.mode=Mode::Live;advance();const auto cal=tap(125,151);
+    require(cal.action==Action::RecordDial&&cal.gear==0&&cal.point==0&&cal.value==50,"record physical reading");
+    picture("dial");
+    state.dial.record(0,0,25,80);state.dial.record(0,1,75,160);tap(50,285);
+    require(has(lv_scr_act(),"Ручка ~ 50 % по замерам"),"empirical percent");tap(50,285);
+    state.workshop.set(Input::Pitch,150);tap(170,285);tap(50,285);
+    require(!has(lv_scr_act(),"Все рычаги")&&!has(lv_scr_act(),"Обороты"),"unsupported pitch has no setup");
+    state.workshop.set(Input::Pitch,80);state.workshop.set(Input::Left,1);
+    state.workshop.set(Input::Internal,1);state.workshop.set(Input::ThreadDiameter,5000);
+    tap(170,285);tap(170,285);
+    require(ui.screen()==Screen::ThreadInfo&&has(lv_scr_act(),"Сверло под метчик ~ 49.20"),"internal drill reference");
+    labelsFit(lv_scr_act());tap(50,285);tap(50,285);
+    require(has(lv_scr_act(),"В   Ход: П, вправо")&&has(lv_scr_act(),"Г   Шаг (III): вверх"),"left-hand pitch");
+    tap(170,240);require(has(lv_scr_act(),"Ниже ступени: 29 об/мин")&&has(lv_scr_act(),"Ручка: вне замеров"),"below slowest step");
+    labelsFit(lv_scr_act());
+    tap(50,285);tap(50,285);
     tap(50,85);require(ui.screen()==Screen::Graphs,"graph view");tap(170,285);require(has(lv_scr_act(),"2 мин"),"graph range");
     tap(50,285);tap(50,243);require(ui.screen()==Screen::Network,"network menu");
     tap(170,285);require(ui.screen()==Screen::ConfirmOTA,"maintenance physical confirmation");tap(50,285);tap(50,285);tap(50,285);
     tap(50,285);tap(50,128);require(ui.screen()==Screen::Turning&&has(lv_scr_act(),"Расчёт RPM"),"turning");
     tap(50,285);tap(50,162);require(ui.screen()==Screen::Rough&&has(lv_scr_act(),"Черновых"),"roughing");
     tap(50,285);tap(170,162);require(ui.screen()==Screen::Feed&&has(lv_scr_act(),"Ходовой вал"),"mechanical feed");
+    tap(120,240);require(ui.screen()==Screen::Controls&&has(lv_scr_act(),"Коробка подач"),"feedbox from feed");
+    tap(131,91);require(has(lv_scr_act(),"Подача 0,08 мм/об. Ручка III вверх."),"feed detent");
+    tap(50,285);tap(50,285);
     tap(50,285);tap(170,205);require(ui.screen()==Screen::Demo,"demo slider");
     state.settings.mode=Mode::Demo;advance();
     require(tap(170,160).action==Action::DemoSpeed,"slider sends demo target");

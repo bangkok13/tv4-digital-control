@@ -4,10 +4,12 @@
 
 namespace tv4 {
 enum class Screen { Splash, Home, Settings, Stats, Diagnostics, ConfirmReset, Menu, Graphs,
-    Turning, Thread, Rough, Feed, Controls, ControlCard, Inputs, Number, Demo, Network, ConfirmOTA, History, ThreadInfo, SettingsExtra };
+    Turning, Thread, Rough, Feed, Controls, ControlCard, Inputs, Number, Demo, Network, ConfirmOTA, History, ThreadInfo, SettingsExtra,
+    ThreadSetup, ThreadRpm, Dial, Plate };
 enum class Action { None, ToggleMode, Decrease, Increase, Calibrate, Reset, SetInput,
-    DemoSpeed, Portal, ArmOTA, CloseNetwork };
-struct Command { Action action=Action::None; Field field=Field::Brightness; Input input=Input::Diameter; int value=0; };
+    DemoSpeed, Portal, ArmOTA, CloseNetwork, RecordDial };
+struct Command { Action action=Action::None; Field field=Field::Brightness; Input input=Input::Diameter; int value=0;
+    unsigned gear=0, point=0; };
 class UIManager {
 public:
     void begin();
@@ -17,11 +19,13 @@ public:
     Screen screen() const { return screen_; }
     bool needsUpdate() const { return rebuild_ || fieldChanged_ || splashExpired(); }
     void resetFailed();
+    void dialFeedback(const char* message) { dialMessage_=message; fieldChanged_=true; }
 private:
     enum class Key { Home, Settings, Stats, Diagnostics, Confirm, Cancel, Yes, Mode, FieldNext, Dec, Inc, Cal, More,
         Menu, Graphs, Turning, Thread, Rough, Feed, Controls, Inputs, Back, Prev, Next, Demo, Network,
         Portal, Arm, AcceptOTA, CloseNet, History, Auto, Save, Erase, Dot, ThreadInfo, SettingsExtra,
-        WorkSettings, ThreadSettings, Slot0, Slot1, Slot2, Slot3, Slot4,
+        WorkSettings, ThreadSettings, ThreadSetup, ThreadRpm, Dial, Plate, DialMinus, DialPlus, PointA, PointB,
+        Slot0, Slot1, Slot2, Slot3, Slot4,
         Slot5, Slot6, Slot7, Slot8, Digit0,Digit1,Digit2,Digit3,Digit4,Digit5,Digit6,Digit7,Digit8,Digit9 };
     static void clicked(lv_event_t* e);
     void navigate(Key key);
@@ -32,13 +36,18 @@ private:
     void buildWorkshop();
     void renderWorkshop(const MachineState& state);
     void workshopKey(Key key);
+    void buildThreadView();
+    void renderThreadView(const MachineState& state);
     void dataRows(unsigned count,int y,int step);
     void put(unsigned n,const char* name,const char* value);
     lv_obj_t* caption(const char* text,int x,int y,int w,uint32_t ink=0xf1f6fa,bool wrap=false);
     static void sliderChanged(lv_event_t* e);
     Screen calc_=Screen::Turning,controlOrigin_=Screen::Menu;
+    Screen plateOrigin_=Screen::Controls;
     bool threadGuide_=true,numberError_=false;
     unsigned graphWindow_=0,controlGroup_=0,controlIndex_=0;
+    unsigned platePage_=0, dialPercent_=50;
+    const char* dialMessage_="";
     Input edit_=Input::Diameter;
     char digits_[12]{};
     const MachineState* state_=nullptr;

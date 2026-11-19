@@ -47,6 +47,32 @@ struct Thread {
     double height, pitchDiameter, externalRoot, internalMinor, drill;
 };
 std::optional<Thread> threadGeometry(double diameter, double pitch);
+// Positions are the direction of the handle tip, viewed from the front.
+enum class LeverPos { DownRight, Down, DownLeft, Up, UpRight, UpLeft };
+const char* positionName(LeverPos position);
+std::optional<LeverPos> pitchPosition(unsigned pitchHundredths);
+struct SpindleGear { unsigned rpm; LeverPos first, second; };
+extern const SpindleGear spindleGears[6];
+struct ThreadSpeed {
+    double metresPerMinute;
+    unsigned calculated, target, gear;
+    bool belowPlate;
+};
+std::optional<ThreadSpeed> threadSpeed(const Workshop& work);
+void formatMillimetres(unsigned hundredths, char* text, unsigned size);
+
+struct DialPoint { uint16_t rpm = 0; uint8_t percent = 0, reserved = 0; };
+struct DialPair {
+    DialPoint points[2]{};
+    bool valid() const;
+    std::optional<unsigned> percentFor(unsigned rpm) const;
+};
+struct DialBook {
+    DialPair gears[6]{};
+    bool valid() const;
+    bool record(unsigned gear, unsigned point, unsigned percent, unsigned measuredRpm);
+};
+static_assert(sizeof(DialBook)==48, "Keep dial journal layout compatible");
 struct Passes {
     double diameterRemoval, radialRemoval, finishing;
     unsigned rough;
@@ -54,6 +80,7 @@ struct Passes {
 std::optional<Passes> roughing(double start, double finish, double depth, double allowance);
 struct Control {
     unsigned number;
+    const char *letter;
     const char *name;
     const char *purpose;
     const char *threading;
