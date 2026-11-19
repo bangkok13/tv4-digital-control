@@ -80,11 +80,11 @@ int main(int argc,char** argv) {
     advance();
     down=false; advance();
     require(ui.take().action==Action::None && ui.screen()==Screen::Home &&
-            has(lv_scr_act(),"TV-4 DIGITAL") && !has(lv_scr_act(),"GARAGE"),"home after held boot touch");
-    require(flushes>0 && has(lv_scr_act(),"1250") && has(lv_scr_act(),"DEMO"),"demo tachometer");
+            has(lv_scr_act(),"TV-4 Шкыльнык") && !has(lv_scr_act(),"GARAGE"),"home after held boot touch");
+    require(flushes>0 && has(lv_scr_act(),"1250") && has(lv_scr_act(),"D"),"demo tachometer");
     if (argc>=2) capture(argv[1]);
     tap(170,285); require(ui.screen()==Screen::Stats && has(lv_scr_act(),"Пуски") &&
-                          has(lv_scr_act(),"TV-4 DIGITAL") && !has(lv_scr_act(),"TV-4 Шкильнык"),"stats");
+                          has(lv_scr_act(),"TV-4 DIGITAL") && has(lv_scr_act(),"DEMO"),"stats");
     tap(170,285); require(ui.screen()==Screen::ConfirmReset,"reset asks first");
     require(tap(50,285).action==Action::None && ui.screen()==Screen::Stats,"cancel reset");
     tap(170,285); require(tap(170,285).action==Action::Reset,"confirmed reset");
@@ -105,8 +105,8 @@ int main(int argc,char** argv) {
     tap(170,285); require(has(lv_scr_act(),"Не подключено"),"disconnected Modbus");
     tap(50,285); tap(50,285);tap(50,285);
     state.settings.mode=Mode::Live; state.motion={}; advance();
-    require(has(lv_scr_act(),"LIVE") && !has(lv_scr_act(),"DEMO") && has(lv_scr_act(),"Н/Д") &&
-            has(lv_scr_act(),"TV-4 DIGITAL"),"live without sensor");
+    require(has(lv_scr_act(),"L") && !has(lv_scr_act(),"D") && has(lv_scr_act(),"Н/Д") &&
+            has(lv_scr_act(),"TV-4 Шкыльнык"),"live without sensor");
     tap(50,285);tap(170,126);require(ui.screen()==Screen::Thread,"thread menu");
     tap(170,285);tap(100,111);require(ui.screen()==Screen::Number,"pitch keyboard");
     tap(40,113);tap(40,234);tap(120,113);tap(120,153);const auto edit=tap(170,285);
@@ -137,7 +137,7 @@ int main(int argc,char** argv) {
     for (unsigned i=0;i<300;++i) {
         tap(50,285);tap(170,244);tap(170,285);tap(170,285);tap(50,285);tap(50,285);tap(50,285);
         tap(170,285); tap(50,285);
-        require(ui.screen()==Screen::Home && has(lv_scr_act(),"LIVE"),"navigation cycle");
+        require(ui.screen()==Screen::Home && has(lv_scr_act(),"L"),"navigation cycle");
     }
     lv_mem_monitor(&end);
     require(end.free_size+256>=start.free_size,"LVGL heap stable");

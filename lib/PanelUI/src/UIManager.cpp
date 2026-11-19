@@ -5,6 +5,7 @@
 
 extern "C" {
 LV_FONT_DECLARE(tv4_text_15);
+LV_FONT_DECLARE(tv4_title_23);
 LV_IMG_DECLARE(tv4_splash_motorcycle);
 }
 namespace tv4 {
@@ -80,7 +81,7 @@ void UIManager::begin() {
     body_=lv_obj_create(root);
     lv_obj_remove_style_all(body_);
     lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);
-    title_=label(root,"",12,10,166);
+    title_=label(root,"",12,10,184);
     badge_=label(root,"",177,10,55,amber,LV_TEXT_ALIGN_CENTER);
     lv_obj_set_style_bg_color(badge_,color(surface),0);
     lv_obj_set_style_bg_opa(badge_,LV_OPA_COVER,0);
@@ -145,8 +146,12 @@ void UIManager::build() {
     lv_obj_set_size(body_,240,320-top);
     rebuild_=false;
     if (screen_!=Screen::Splash) {
-        set(title_,"TV-4 DIGITAL");
-        lv_obj_set_style_text_font(title_,&lv_font_montserrat_20,0);
+        const bool home = screen_==Screen::Home;
+        set(title_,home ? "TV-4 Шкыльнык" : "TV-4 DIGITAL");
+        lv_obj_set_y(title_,home ? 7 : 10);
+        lv_obj_set_style_text_font(title_,home ? &tv4_title_23 : &lv_font_montserrat_20,0);
+        lv_obj_set_x(badge_,home ? 200 : 177);
+        lv_obj_set_width(badge_,home ? 28 : 55);
     }
     switch(screen_) {
     case Screen::Splash:
@@ -256,7 +261,10 @@ void UIManager::update(const MachineState& s) {
     if (rebuild_) build();
     fieldChanged_=false;
     const bool demo=s.settings.mode==Mode::Demo;
-    set(badge_,demo ? "DEMO" : "LIVE"); ink(badge_,demo ? amber : green);
+    const char* modeText = demo ? "DEMO" : "LIVE";
+    if (screen_==Screen::Home) modeText = demo ? "D" : "L";
+    set(badge_,modeText);
+    ink(badge_,demo ? amber : green);
     char buf[80];
     switch(screen_) {
     case Screen::Splash: break;
@@ -270,7 +278,7 @@ void UIManager::update(const MachineState& s) {
         if (lv_bar_get_max_value(bar_)!=scale) lv_bar_set_range(bar_,0,scale);
         lv_bar_set_value(bar_,s.motion.hasRpm ? std::min<int>(std::lround(s.motion.rpm),scale) : 0,LV_ANIM_OFF);
         std::snprintf(buf,sizeof(buf),"%d RPM",scale); set(limit_,buf);
-        set(signal_,demo ? (s.motion.rotating ? "Вращение DEMO" : "Пауза DEMO") :
+        set(signal_,demo ? (s.motion.rotating ? "Симуляция вращения" : "Пауза симуляции") :
             s.motion.hasRpm ? (s.motion.rotating ? "Вращение: импульсы" : "Импульсы ниже порога") : signalText(s.motion.signal));
         ink(signal_,s.motion.signal==Signal::Overrun ? red : s.motion.rotating ? green : amber);
         const bool recent=s.motion.pulses && s.uptimeUs>=s.motion.lastEdgeUs && s.uptimeUs-s.motion.lastEdgeUs<180000;
